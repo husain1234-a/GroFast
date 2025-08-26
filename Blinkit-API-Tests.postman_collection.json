@@ -1,0 +1,91 @@
+{
+  "info": {
+    "name": "Blinkit Clone API",
+    "description": "Complete API collection for Blinkit Clone",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Health Check",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/health",
+          "host": ["{{base_url}}"],
+          "path": ["health"]
+        }
+      }
+    },
+    {
+      "name": "Get Categories",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/products/categories",
+          "host": ["{{base_url}}"],
+          "path": ["products", "categories"]
+        }
+      }
+    },
+    {
+      "name": "Get Products",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/products?limit=10",
+          "host": ["{{base_url}}"],
+          "path": ["products"],
+          "query": [{"key": "limit", "value": "10"}]
+        }
+      }
+    },
+    {
+      "name": "Google Login",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"google_id_token\": \"dummy_google_token_for_testing\"\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/auth/google-login",
+          "host": ["{{base_url}}"],
+          "path": ["auth", "google-login"]
+        }
+      }
+    },
+    {
+      "name": "Get Cart",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "firebase_token",
+            "value": "dummy_firebase_token"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/cart?firebase_token=dummy_token",
+          "host": ["{{base_url}}"],
+          "path": ["cart"],
+          "query": [{"key": "firebase_token", "value": "dummy_token"}]
+        }
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:8000"
+    }
+  ]
+}

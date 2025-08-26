@@ -1,0 +1,85 @@
+# Consolidated Requirements for All Microservices
+# Generated from all individual service requirements.txt files
+
+# Core FastAPI & Server
+fastapi
+uvicorn
+
+# Database & ORM
+sqlalchemy[asyncio]
+asyncpg
+
+# Data Validation & Settings
+pydantic
+pydantic-settings
+
+# HTTP Client
+httpx
+
+# Authentication & Firebase
+firebase-admin
+
+# Cache & Storage
+redis
+supabase
+
+# From auth-service/requirements.txt:
+# fastapi (already included)
+# uvicorn (already included)
+# sqlalchemy[asyncio] (already included)
+# asyncpg (already included)
+# pydantic (already included)
+# pydantic-settings (already included)
+# firebase-admin (already included)
+# httpx (already included)
+
+# From product-service/requirements.txt:
+# fastapi (already included)
+# uvicorn (already included)
+# sqlalchemy[asyncio] (already included)
+# asyncpg (already included)
+# pydantic (already included)
+# pydantic-settings (already included)
+
+# From cart-service/requirements.txt:
+# fastapi (already included)
+# uvicorn (already included)
+# sqlalchemy[asyncio] (already included)
+# asyncpg (already included)
+# pydantic (already included)
+# pydantic-settings (already included)
+# httpx (already included)
+
+# From order-service/requirements.txt:
+# fastapi (already included)
+# uvicorn (already included)
+# sqlalchemy[asyncio] (already included)
+# asyncpg (already included)
+# pydantic (already included)
+# pydantic-settings (already included)
+# httpx (already included)
+
+# From delivery-service/requirements.txt:
+# fastapi (already included)
+# uvicorn (already included)
+# sqlalchemy[asyncio] (already included)
+# asyncpg (already included)
+# pydantic (already included)
+# pydantic-settings (already included)
+# httpx (already included)
+# supabase (already included)
+
+# From notification-service/requirements.txt:
+# fastapi (already included)
+# uvicorn (already included)
+# pydantic (already included)
+# httpx (already included)
+
+# From api-gateway/requirements.txt:
+# fastapi (already included)
+# uvicorn (already included)
+# httpx (already included)
+# redis (already included)
+# pydantic-settings (already included)
+
+# All unique dependencies are included above

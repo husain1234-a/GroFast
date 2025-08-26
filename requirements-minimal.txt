@@ -1,0 +1,20 @@
+# Minimal working requirements
+fastapi
+uvicorn
+sqlalchemy[asyncio]
+asyncpg
+alembic
+redis
+celery
+pydantic
+pydantic-settings
+firebase-admin
+httpx
+supabase
+meilisearch
+python-multipart
+python-jose[cryptography]
+passlib[bcrypt]
+loguru
+boto3
+python-dotenv

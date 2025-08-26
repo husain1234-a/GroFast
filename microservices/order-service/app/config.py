@@ -1,0 +1,17 @@
+from pydantic_settings import BaseSettings
+from typing import List
+
+class OrderServiceSettings(BaseSettings):
+    database_url: str = "postgresql+asyncpg://postgres:admin123@localhost:5432/grofast_db"
+    redis_url: str = "redis://localhost:6379/0"
+    jwt_secret_key: str = "super-secret-jwt-key"
+    jwt_algorithm: str = "HS256"
+    cart_service_url: str = "http://localhost:8003"
+    notification_service_url: str = "http://localhost:8006"
+    debug: bool = True
+    cors_origins: List[str] = ["*"]
+    
+    class Config:
+        env_file = ".env"
+
+settings = OrderServiceSettings()

@@ -1,0 +1,142 @@
+version: '3.8'
+
+services:
+  # Infrastructure
+  postgres:
+    image: postgres:15
+    environment:
+      POSTGRES_DB: blinkit_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password123
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+
+  meilisearch:
+    image: getmeili/meilisearch:v1.5
+    ports:
+      - "7700:7700"
+    environment:
+      MEILI_MASTER_KEY: dummy-master-key-123
+    volumes:
+      - meilisearch_data:/meili_data
+
+  # API Gateway
+  api-gateway:
+    build:
+      context: ./api-gateway
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      - AUTH_SERVICE_URL=http://auth-service:8001
+      - PRODUCT_SERVICE_URL=http://product-service:8002
+      - CART_SERVICE_URL=http://cart-service:8003
+      - ORDER_SERVICE_URL=http://order-service:8004
+      - DELIVERY_SERVICE_URL=http://delivery-service:8005
+      - NOTIFICATION_SERVICE_URL=http://notification-service:8006
+      - REDIS_URL=redis://redis:6379/0
+    depends_on:
+      - redis
+      - auth-service
+      - product-service
+
+  # Auth Service
+  auth-service:
+    build:
+      context: ./auth-service
+      dockerfile: Dockerfile
+    ports:
+      - "8001:8001"
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://postgres:password123@postgres:5432/blinkit_db
+      - REDIS_URL=redis://redis:6379/0
+    depends_on:
+      - postgres
+      - redis
+
+  # Product Service
+  product-service:
+    build:
+      context: ./product-service
+      dockerfile: Dockerfile
+    ports:
+      - "8002:8002"
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://postgres:password123@postgres:5432/blinkit_db
+      - MEILISEARCH_URL=http://meilisearch:7700
+      - MEILISEARCH_MASTER_KEY=dummy-master-key-123
+    depends_on:
+      - postgres
+      - meilisearch
+
+  # Cart Service
+  cart-service:
+    build:
+      context: ./cart-service
+      dockerfile: Dockerfile
+    ports:
+      - "8003:8003"
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://postgres:password123@postgres:5432/blinkit_db
+      - REDIS_URL=redis://redis:6379/0
+      - AUTH_SERVICE_URL=http://auth-service:8001
+      - PRODUCT_SERVICE_URL=http://product-service:8002
+    depends_on:
+      - postgres
+      - redis
+
+  # Order Service
+  order-service:
+    build:
+      context: ./order-service
+      dockerfile: Dockerfile
+    ports:
+      - "8004:8004"
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://postgres:password123@postgres:5432/blinkit_db
+      - AUTH_SERVICE_URL=http://auth-service:8001
+      - CART_SERVICE_URL=http://cart-service:8003
+      - NOTIFICATION_SERVICE_URL=http://notification-service:8006
+    depends_on:
+      - postgres
+
+  # Delivery Service
+  delivery-service:
+    build:
+      context: ./delivery-service
+      dockerfile: Dockerfile
+    ports:
+      - "8005:8005"
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://postgres:password123@postgres:5432/blinkit_db
+      - SUPABASE_URL=https://ktpugnrihesretpdzbkn.supabase.co
+      - SUPABASE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imt0cHVnbnJpaGVzcmV0cGR6YmtuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTE3ODYzODAsImV4cCI6MjA2NzM2MjM4MH0.ZLhDDC8b_JUfTvt6yPxl8yk8l4F9DDHNTEWIaBVfQ84
+    depends_on:
+      - postgres
+
+  # Notification Service
+  notification-service:
+    build:
+      context: ./notification-service
+      dockerfile: Dockerfile
+    ports:
+      - "8006:8006"
+    environment:
+      - FCM_SERVER_KEY=AAAA1234567890:APA91bHdummy_fcm_server_key_for_development
+      - REDIS_URL=redis://redis:6379/0
+    depends_on:
+      - redis
+
+volumes:
+  postgres_data:
+  redis_data:
+  meilisearch_data:
