@@ -1,1 +1,107 @@
-from sqlalchemy.ext.asyncio import AsyncSession\nfrom sqlalchemy import select\nfrom ..models.delivery import DeliveryPartner, DeliveryLocation, DeliveryStatus\nimport httpx\nfrom supabase import create_client, Client\nimport os\n\nclass DeliveryService:\n    def __init__(self):\n        supabase_url = os.getenv('SUPABASE_URL')\n        supabase_key = os.getenv('SUPABASE_KEY')\n        self.supabase: Client = create_client(supabase_url, supabase_key)\n    \n    @staticmethod\n    async def get_delivery_partner(db: AsyncSession, firebase_uid: str):\n        result = await db.execute(\n            select(DeliveryPartner).where(DeliveryPartner.firebase_uid == firebase_uid)\n        )\n        return result.scalar_one_or_none()\n    \n    @staticmethod\n    async def update_status(db: AsyncSession, firebase_uid: str, status: DeliveryStatus):\n        result = await db.execute(\n            select(DeliveryPartner).where(DeliveryPartner.firebase_uid == firebase_uid)\n        )\n        partner = result.scalar_one_or_none()\n        \n        if partner:\n            partner.status = status\n            await db.commit()\n            await db.refresh(partner)\n        \n        return partner\n    \n    async def update_location(self, db: AsyncSession, firebase_uid: str, latitude: float, longitude: float, order_id: int = None):\n        # Update in PostgreSQL\n        result = await db.execute(\n            select(DeliveryPartner).where(DeliveryPartner.firebase_uid == firebase_uid)\n        )\n        partner = result.scalar_one_or_none()\n        \n        if partner:\n            partner.current_latitude = str(latitude)\n            partner.current_longitude = str(longitude)\n            \n            # Save location history\n            location = DeliveryLocation(\n                delivery_partner_id=partner.id,\n                order_id=order_id,\n                latitude=latitude,\n                longitude=longitude\n            )\n            db.add(location)\n            await db.commit()\n            \n            # Update Supabase for real-time tracking\n            try:\n                self.supabase.table('delivery_locations').insert({\n                    'delivery_partner_id': partner.id,\n                    'order_id': order_id,\n                    'latitude': latitude,\n                    'longitude': longitude\n                }).execute()\n            except Exception as e:\n                print(f\"Supabase update failed: {e}\")\n        \n        return partner\n    \n    @staticmethod\n    async def get_assigned_orders(db: AsyncSession, firebase_uid: str):\n        partner = await DeliveryService.get_delivery_partner(db, firebase_uid)\n        if not partner:\n            return []\n        \n        # Get orders from Order Service\n        try:\n            async with httpx.AsyncClient() as client:\n                response = await client.get(f\"http://order-service:8004/orders/assigned/{partner.id}\")\n                if response.status_code == 200:\n                    return response.json()\n        except:\n            pass\n        \n        return []
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
+from ..models.delivery import DeliveryPartner, DeliveryLocation, DeliveryStatus
+from supabase import create_client, Client
+import sys
+import os
+
+# Add shared modules to path
+sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..', '..', 'shared'))
+
+from http_client import ResilientHttpClient
+from circuit_breaker import CircuitBreaker, RetryConfig
+
+class DeliveryService:
+    # Initialize resilient HTTP client for order service
+    _order_client = None
+    
+    def __init__(self):
+        supabase_url = os.getenv('SUPABASE_URL')
+        supabase_key = os.getenv('SUPABASE_KEY')
+        self.supabase: Client = create_client(supabase_url, supabase_key)
+    
+    @classmethod
+    def get_order_client(cls) -> ResilientHttpClient:
+        if cls._order_client is None:
+            cls._order_client = ResilientHttpClient(
+                base_url="http://localhost:8004",
+                timeout=5.0,
+                circuit_breaker=CircuitBreaker(name="OrderService"),
+                retry_config=RetryConfig(max_attempts=3, base_delay=0.5)
+            )
+        return cls._order_client
+    
+    @staticmethod
+    async def get_delivery_partner(db: AsyncSession, firebase_uid: str):
+        result = await db.execute(
+            select(DeliveryPartner).where(DeliveryPartner.firebase_uid == firebase_uid)
+        )
+        return result.scalar_one_or_none()
+    
+    @staticmethod
+    async def update_status(db: AsyncSession, firebase_uid: str, status: DeliveryStatus):
+        result = await db.execute(
+            select(DeliveryPartner).where(DeliveryPartner.firebase_uid == firebase_uid)
+        )
+        partner = result.scalar_one_or_none()
+        
+        if partner:
+            partner.status = status
+            await db.commit()
+            await db.refresh(partner)
+        
+        return partner
+    
+    async def update_location(self, db: AsyncSession, firebase_uid: str, latitude: float, longitude: float, order_id: int = None):
+        # Update in PostgreSQL
+        result = await db.execute(
+            select(DeliveryPartner).where(DeliveryPartner.firebase_uid == firebase_uid)
+        )
+        partner = result.scalar_one_or_none()
+        
+        if partner:
+            partner.current_latitude = str(latitude)
+            partner.current_longitude = str(longitude)
+            
+            # Save location history
+            location = DeliveryLocation(
+                delivery_partner_id=partner.id,
+                order_id=order_id,
+                latitude=latitude,
+                longitude=longitude
+            )
+            db.add(location)
+            await db.commit()
+            
+            # Update Supabase for real-time tracking
+            try:
+                self.supabase.table('delivery_locations').insert({
+                    'delivery_partner_id': partner.id,
+                    'order_id': order_id,
+                    'latitude': latitude,
+                    'longitude': longitude
+                }).execute()
+            except Exception as e:
+                print(f"Supabase update failed: {e}")
+        
+        return partner
+    
+    @staticmethod
+    async def get_assigned_orders(db: AsyncSession, firebase_uid: str):
+        partner = await DeliveryService.get_delivery_partner(db, firebase_uid)
+        if not partner:
+            return []
+        
+        # Get orders from Order Service using resilient client
+        order_client = DeliveryService.get_order_client()
+        try:
+            response = await order_client.get(f"/orders/assigned/{partner.id}")
+            if response.status_code == 200:
+                return response.json()
+            else:
+                # Order service error - return empty list as fallback
+                return []
+        except Exception as e:
+            # Circuit breaker or network error - return empty list as fallback
+            print(f"Warning: Failed to get assigned orders from Order Service: {e}")
+            return []

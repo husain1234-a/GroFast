@@ -1,1 +1,1 @@
-# Shared utilities for microservices
+# Shared components for GroFast microservices

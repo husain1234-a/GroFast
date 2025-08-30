@@ -3,3 +3,4 @@ uvicorn
 httpx
 redis
 pydantic-settings
+python-jose[cryptography]

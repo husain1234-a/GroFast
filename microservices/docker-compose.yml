@@ -1,17 +1,66 @@
 version: '3.8'
 
 services:
-  # Infrastructure
-  postgres:
+  # Infrastructure - Separate databases per service
+  auth-db:
     image: postgres:15
     environment:
-      POSTGRES_DB: blinkit_db
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: password123
+      POSTGRES_DB: auth_db
+      POSTGRES_USER: auth_user
+      POSTGRES_PASSWORD: auth_pass123
     ports:
-      - "5432:5432"
+      - "5433:5432"
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - auth_db_data:/var/lib/postgresql/data
+    restart: unless-stopped
+
+  product-db:
+    image: postgres:15
+    environment:
+      POSTGRES_DB: product_db
+      POSTGRES_USER: product_user
+      POSTGRES_PASSWORD: product_pass123
+    ports:
+      - "5434:5432"
+    volumes:
+      - product_db_data:/var/lib/postgresql/data
+    restart: unless-stopped
+
+  cart-db:
+    image: postgres:15
+    environment:
+      POSTGRES_DB: cart_db
+      POSTGRES_USER: cart_user
+      POSTGRES_PASSWORD: cart_pass123
+    ports:
+      - "5435:5432"
+    volumes:
+      - cart_db_data:/var/lib/postgresql/data
+    restart: unless-stopped
+
+  order-db:
+    image: postgres:15
+    environment:
+      POSTGRES_DB: order_db
+      POSTGRES_USER: order_user
+      POSTGRES_PASSWORD: order_pass123
+    ports:
+      - "5436:5432"
+    volumes:
+      - order_db_data:/var/lib/postgresql/data
+    restart: unless-stopped
+
+  delivery-db:
+    image: postgres:15
+    environment:
+      POSTGRES_DB: delivery_db
+      POSTGRES_USER: delivery_user
+      POSTGRES_PASSWORD: delivery_pass123
+    ports:
+      - "5437:5432"
+    volumes:
+      - delivery_db_data:/var/lib/postgresql/data
+    restart: unless-stopped
 
   redis:
     image: redis:7-alpine
@@ -48,6 +97,19 @@ services:
       - redis
       - auth-service
       - product-service
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 512M
+        reservations:
+          cpus: '0.5'
+          memory: 256M
 
   # Auth Service
   auth-service:
@@ -57,11 +119,16 @@ services:
     ports:
       - "8001:8001"
     environment:
-      - DATABASE_URL=postgresql+asyncpg://postgres:password123@postgres:5432/blinkit_db
+      - DATABASE_URL=postgresql+asyncpg://auth_user:auth_pass123@auth-db:5432/auth_db
       - REDIS_URL=redis://redis:6379/0
     depends_on:
-      - postgres
+      - auth-db
       - redis
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
   # Product Service
   product-service:
@@ -71,12 +138,17 @@ services:
     ports:
       - "8002:8002"
     environment:
-      - DATABASE_URL=postgresql+asyncpg://postgres:password123@postgres:5432/blinkit_db
+      - DATABASE_URL=postgresql+asyncpg://product_user:product_pass123@product-db:5432/product_db
       - MEILISEARCH_URL=http://meilisearch:7700
       - MEILISEARCH_MASTER_KEY=dummy-master-key-123
     depends_on:
-      - postgres
+      - product-db
       - meilisearch
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8002/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
   # Cart Service
   cart-service:
@@ -86,13 +158,18 @@ services:
     ports:
       - "8003:8003"
     environment:
-      - DATABASE_URL=postgresql+asyncpg://postgres:password123@postgres:5432/blinkit_db
+      - DATABASE_URL=postgresql+asyncpg://cart_user:cart_pass123@cart-db:5432/cart_db
       - REDIS_URL=redis://redis:6379/0
       - AUTH_SERVICE_URL=http://auth-service:8001
       - PRODUCT_SERVICE_URL=http://product-service:8002
     depends_on:
-      - postgres
+      - cart-db
       - redis
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8003/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
   # Order Service
   order-service:
@@ -102,12 +179,17 @@ services:
     ports:
       - "8004:8004"
     environment:
-      - DATABASE_URL=postgresql+asyncpg://postgres:password123@postgres:5432/blinkit_db
+      - DATABASE_URL=postgresql+asyncpg://order_user:order_pass123@order-db:5432/order_db
       - AUTH_SERVICE_URL=http://auth-service:8001
       - CART_SERVICE_URL=http://cart-service:8003
       - NOTIFICATION_SERVICE_URL=http://notification-service:8006
     depends_on:
-      - postgres
+      - order-db
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8004/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
   # Delivery Service
   delivery-service:
@@ -117,11 +199,16 @@ services:
     ports:
       - "8005:8005"
     environment:
-      - DATABASE_URL=postgresql+asyncpg://postgres:password123@postgres:5432/blinkit_db
-      - SUPABASE_URL=https://ktpugnrihesretpdzbkn.supabase.co
-      - SUPABASE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imt0cHVnbnJpaGVzcmV0cGR6YmtuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTE3ODYzODAsImV4cCI6MjA2NzM2MjM4MH0.ZLhDDC8b_JUfTvt6yPxl8yk8l4F9DDHNTEWIaBVfQ84
+      - DATABASE_URL=postgresql+asyncpg://delivery_user:delivery_pass123@delivery-db:5432/delivery_db
+      - SUPABASE_URL=${SUPABASE_URL:-https://ktpugnrihesretpdzbkn.supabase.co}
+      - SUPABASE_KEY=${SUPABASE_KEY:-eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imt0cHVnbnJpaGVzcmV0cGR6YmtuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTE3ODYzODAsImV4cCI6MjA2NzM2MjM4MH0.ZLhDDC8b_JUfTvt6yPxl8yk8l4F9DDHNTEWIaBVfQ84}
     depends_on:
-      - postgres
+      - delivery-db
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8005/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
   # Notification Service
   notification-service:
@@ -131,12 +218,21 @@ services:
     ports:
       - "8006:8006"
     environment:
-      - FCM_SERVER_KEY=AAAA1234567890:APA91bHdummy_fcm_server_key_for_development
+      - FCM_SERVER_KEY=${FCM_SERVER_KEY:-AAAA1234567890:APA91bHdummy_fcm_server_key_for_development}
       - REDIS_URL=redis://redis:6379/0
     depends_on:
       - redis
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8006/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
 volumes:
-  postgres_data:
+  auth_db_data:
+  product_db_data:
+  cart_db_data:
+  order_db_data:
+  delivery_db_data:
   redis_data:
   meilisearch_data:

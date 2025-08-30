@@ -13,7 +13,7 @@ class ProductServiceSettings(BaseSettings):
     r2_secret_access_key: str = "dummy_secret_key_456"
     r2_bucket_name: str = "grofast-assets"
     debug: bool = True
-    cors_origins: List[str] = ["*"]
+    cors_origins: List[str] = ["http://localhost:3000", "http://localhost:8080", "https://localhost:3000"]
     
     class Config:
         env_file = ".env"

@@ -9,7 +9,14 @@ class DatabaseManager:
             database_url,
             echo=False,
             pool_pre_ping=True,
-            pool_recycle=300
+            pool_recycle=300,
+            pool_size=5,
+            max_overflow=10,
+            connect_args={
+                "server_settings": {
+                    "application_name": "blinkit_microservice"
+                }
+            }
         )
         self.AsyncSessionLocal = async_sessionmaker(
             self.engine,

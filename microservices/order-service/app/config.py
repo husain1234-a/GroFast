@@ -9,7 +9,7 @@ class OrderServiceSettings(BaseSettings):
     cart_service_url: str = "http://localhost:8003"
     notification_service_url: str = "http://localhost:8006"
     debug: bool = True
-    cors_origins: List[str] = ["*"]
+    cors_origins: List[str] = ["http://localhost:3000", "http://localhost:8080", "https://localhost:3000"]
     
     class Config:
         env_file = ".env"

@@ -11,7 +11,7 @@ class AuthServiceSettings(BaseSettings):
     google_client_id: str = "your-google-client-id.apps.googleusercontent.com"
     google_client_secret: str = "your-google-client-secret"
     debug: bool = True
-    cors_origins: List[str] = ["*"]
+    cors_origins: List[str] = ["http://localhost:3000", "http://localhost:8080", "https://localhost:3000"]
     
     class Config:
         env_file = ".env"

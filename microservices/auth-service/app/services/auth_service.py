@@ -2,20 +2,24 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from ..models.user import User
 from ..schemas.user import UserCreate, UserUpdate
-# from ..firebase.auth import verify_firebase_token, verify_google_token
+from ..firebase.auth import verify_firebase_token, verify_google_token
 from fastapi import HTTPException, status
 
 class AuthService:
     @staticmethod
     async def create_or_get_user(db: AsyncSession, firebase_token: str) -> User:
-        # Demo implementation
-        firebase_uid = f"user_{firebase_token[-8:]}"
-        user_info = {
-            'uid': firebase_uid,
-            'email': f"user{firebase_uid[-4:]}@example.com",
-            'name': f"User {firebase_uid[-4:]}",
-            'phone': None
-        }
+        # Verify Firebase token and get user info
+        try:
+            user_info = verify_firebase_token(firebase_token)
+        except HTTPException:
+            # Re-raise HTTP exceptions (invalid token, etc.)
+            raise
+        except Exception as e:
+            # Handle other errors
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Token verification failed"
+            )
         
         result = await db.execute(select(User).where(User.firebase_uid == user_info['uid']))
         user = result.scalar_one_or_none()
@@ -51,13 +55,18 @@ class AuthService:
     
     @staticmethod
     async def create_or_get_user_google(db: AsyncSession, google_token: str) -> User:
-        # Demo implementation
-        firebase_uid = f"google_{google_token[-8:]}"
-        user_info = {
-            'uid': firebase_uid,
-            'email': f"google{firebase_uid[-4:]}@example.com",
-            'name': f"Google User {firebase_uid[-4:]}"
-        }
+        # Verify Google token via Firebase and get user info
+        try:
+            user_info = verify_google_token(google_token)
+        except HTTPException:
+            # Re-raise HTTP exceptions (invalid token, etc.)
+            raise
+        except Exception as e:
+            # Handle other errors
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Google token verification failed"
+            )
         
         result = await db.execute(select(User).where(User.firebase_uid == user_info['uid']))
         user = result.scalar_one_or_none()

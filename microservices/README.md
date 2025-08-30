@@ -228,4 +228,46 @@ API Gateway
 └── Notification Service (independent)
 ```
 
-Your monolithic Blinkit Clone is now a fully functional microservices architecture! 🎉
+## 🔧 Recent Architecture Improvements
+
+This microservices architecture has been enhanced with production-ready patterns:
+
+### ✅ **Resilience & Reliability**
+- **Circuit Breaker Pattern**: Automatic failure detection and recovery
+- **Retry Logic**: Exponential backoff with jitter for failed requests
+- **Graceful Degradation**: Fallback responses when services are unavailable
+- **Health Checks**: Comprehensive health monitoring for all services
+
+### ✅ **Security & Authentication**
+- **Centralized Auth Middleware**: Unified authentication across all services
+- **Environment-based Secrets**: Secure configuration management
+- **Advanced Rate Limiting**: Redis-based sliding window rate limiting
+- **Database Isolation**: Separate database per service for data security
+
+### ✅ **Monitoring & Observability**
+- **Structured Logging**: JSON-formatted logs with request tracing
+- **Metrics Collection**: Prometheus-compatible metrics export
+- **Performance Monitoring**: Request timing and error rate tracking
+- **Circuit Breaker Monitoring**: Real-time resilience pattern status
+
+### ✅ **Production Readiness**
+- **Resource Limits**: CPU and memory constraints for containers
+- **Database Per Service**: Complete data isolation and independence
+- **Enhanced Error Handling**: Comprehensive error management and recovery
+- **Scalability Patterns**: Ready for horizontal scaling and load balancing
+
+### 📊 **New Monitoring Endpoints**
+- `GET /health` - Service health status
+- `GET /metrics` - JSON metrics format
+- `GET /metrics/prometheus` - Prometheus metrics format
+
+### 🔒 **Security Configuration**
+Copy `.env.template` to `.env` and configure your secrets:
+```bash
+cp .env.template .env
+# Edit .env with your secure values
+```
+
+See `ARCHITECTURE_IMPROVEMENTS.md` for detailed documentation of all enhancements.
+
+Your monolithic Blinkit Clone is now a production-ready microservices architecture! 🎉

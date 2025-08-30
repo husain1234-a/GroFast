@@ -1,0 +1,74 @@
+version: '3.8'
+
+services:
+  # Auth Service Database
+  auth-db:
+    image: postgres:15
+    environment:
+      POSTGRES_DB: auth_db
+      POSTGRES_USER: auth_user
+      POSTGRES_PASSWORD: auth_pass123
+    ports:
+      - "5433:5432"
+    volumes:
+      - auth_db_data:/var/lib/postgresql/data
+    restart: unless-stopped
+
+  # Product Service Database
+  product-db:
+    image: postgres:15
+    environment:
+      POSTGRES_DB: product_db
+      POSTGRES_USER: product_user
+      POSTGRES_PASSWORD: product_pass123
+    ports:
+      - "5434:5432"
+    volumes:
+      - product_db_data:/var/lib/postgresql/data
+    restart: unless-stopped
+
+  # Cart Service Database
+  cart-db:
+    image: postgres:15
+    environment:
+      POSTGRES_DB: cart_db
+      POSTGRES_USER: cart_user
+      POSTGRES_PASSWORD: cart_pass123
+    ports:
+      - "5435:5432"
+    volumes:
+      - cart_db_data:/var/lib/postgresql/data
+    restart: unless-stopped
+
+  # Order Service Database
+  order-db:
+    image: postgres:15
+    environment:
+      POSTGRES_DB: order_db
+      POSTGRES_USER: order_user
+      POSTGRES_PASSWORD: order_pass123
+    ports:
+      - "5436:5432"
+    volumes:
+      - order_db_data:/var/lib/postgresql/data
+    restart: unless-stopped
+
+  # Delivery Service Database
+  delivery-db:
+    image: postgres:15
+    environment:
+      POSTGRES_DB: delivery_db
+      POSTGRES_USER: delivery_user
+      POSTGRES_PASSWORD: delivery_pass123
+    ports:
+      - "5437:5432"
+    volumes:
+      - delivery_db_data:/var/lib/postgresql/data
+    restart: unless-stopped
+
+volumes:
+  auth_db_data:
+  product_db_data:
+  cart_db_data:
+  order_db_data:
+  delivery_db_data:

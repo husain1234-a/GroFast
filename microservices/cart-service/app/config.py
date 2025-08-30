@@ -8,7 +8,7 @@ class CartServiceSettings(BaseSettings):
     jwt_algorithm: str = "HS256"
     product_service_url: str = "http://localhost:8002"
     debug: bool = True
-    cors_origins: List[str] = ["*"]
+    cors_origins: List[str] = ["http://localhost:3000", "http://localhost:8080", "https://localhost:3000"]
     
     class Config:
         env_file = ".env"

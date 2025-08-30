@@ -4,9 +4,30 @@ from sqlalchemy.orm import selectinload
 from ..models.cart import Cart, CartItem
 from ..schemas.cart import CartResponse, CartItemResponse, CartItemCreate
 from fastapi import HTTPException, status
-import httpx
+import sys
+import os
+
+# Add shared modules to path
+sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..', '..', 'shared'))
+
+from http_client import ResilientHttpClient
+from circuit_breaker import CircuitBreaker, RetryConfig
 
 class CartService:
+    # Initialize resilient HTTP clients for external services
+    _product_client = None
+    
+    @classmethod
+    def get_product_client(cls) -> ResilientHttpClient:
+        if cls._product_client is None:
+            cls._product_client = ResilientHttpClient(
+                base_url="http://localhost:8002",
+                timeout=5.0,
+                circuit_breaker=CircuitBreaker(name="ProductService"),
+                retry_config=RetryConfig(max_attempts=3, base_delay=0.5)
+            )
+        return cls._product_client
+    
     @staticmethod
     async def get_or_create_cart(db: AsyncSession, user_id: int) -> Cart:
         result = await db.execute(
@@ -26,13 +47,18 @@ class CartService:
     
     @staticmethod
     async def add_item(db: AsyncSession, user_id: int, item_data: CartItemCreate):
-        # Verify product exists via Product Service
-        async with httpx.AsyncClient() as client:
-            try:
-                response = await client.get(f"http://localhost:8002/products/{item_data.product_id}")
-                if response.status_code != 200:
-                    raise HTTPException(status_code=404, detail="Product not found")
-            except:
+        # Verify product exists via Product Service using resilient client
+        product_client = CartService.get_product_client()
+        try:
+            response = await product_client.get(f"/products/{item_data.product_id}")
+            if response.status_code != 200:
+                raise HTTPException(status_code=404, detail="Product not found")
+        except Exception as e:
+            # Circuit breaker or network error - use fallback
+            if "Circuit breaker" in str(e):
+                # Allow adding item even if product service is down (graceful degradation)
+                pass
+            else:
                 raise HTTPException(status_code=404, detail="Product not found")
         
         cart = await CartService.get_or_create_cart(db, user_id)
@@ -91,33 +117,44 @@ class CartService:
         )
         cart = result.scalar_one()
         
-        # Get product details for each item
+        # Get product details for each item using resilient client
         enriched_items = []
         total_amount = 0
+        product_client = CartService.get_product_client()
         
         for item in cart.items:
             try:
-                async with httpx.AsyncClient() as client:
-                    response = await client.get(f"http://localhost:8002/products/{item.product_id}")
-                    if response.status_code == 200:
-                        product = response.json()
-                        item_total = product['price'] * item.quantity
-                        total_amount += item_total
-                        
-                        enriched_items.append(CartItemResponse(
-                            id=item.id,
-                            product_id=item.product_id,
-                            quantity=item.quantity,
-                            product_name=product['name'],
-                            product_price=product['price'],
-                            created_at=item.created_at
-                        ))
-            except:
+                response = await product_client.get(f"/products/{item.product_id}")
+                if response.status_code == 200:
+                    product = response.json()
+                    item_total = product['price'] * item.quantity
+                    total_amount += item_total
+                    
+                    enriched_items.append(CartItemResponse(
+                        id=item.id,
+                        product_id=item.product_id,
+                        quantity=item.quantity,
+                        product_name=product['name'],
+                        product_price=product['price'],
+                        created_at=item.created_at
+                    ))
+                else:
+                    # Product service returned error - use fallback
+                    enriched_items.append(CartItemResponse(
+                        id=item.id,
+                        product_id=item.product_id,
+                        quantity=item.quantity,
+                        product_name="Product Unavailable",
+                        product_price=0,
+                        created_at=item.created_at
+                    ))
+            except Exception as e:
+                # Circuit breaker or network error - use fallback data
                 enriched_items.append(CartItemResponse(
                     id=item.id,
                     product_id=item.product_id,
                     quantity=item.quantity,
-                    product_name="Unknown Product",
+                    product_name="Product Service Unavailable",
                     product_price=0,
                     created_at=item.created_at
                 ))

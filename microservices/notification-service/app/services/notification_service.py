@@ -1,15 +1,47 @@
-import httpx
 import json
 import os
+import sys
 from typing import List, Dict, Any
 from datetime import datetime
 
+# Add shared modules to path
+sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..', '..', 'shared'))
+
+from http_client import ResilientHttpClient
+from circuit_breaker import CircuitBreaker, RetryConfig
+
 class NotificationService:
+    # Initialize resilient HTTP clients for external services
+    _fcm_client = None
+    _resend_client = None
+    
     def __init__(self):
         self.fcm_server_key = os.getenv('FCM_SERVER_KEY', 'demo-key')
         self.fcm_url = "https://fcm.googleapis.com/fcm/send"
         self.resend_api_key = os.getenv('RESEND_API_KEY', '')
         self.resend_url = "https://api.resend.com/emails"
+    
+    @classmethod
+    def get_fcm_client(cls) -> ResilientHttpClient:
+        if cls._fcm_client is None:
+            cls._fcm_client = ResilientHttpClient(
+                base_url="https://fcm.googleapis.com",
+                timeout=10.0,
+                circuit_breaker=CircuitBreaker(name="FCMService"),
+                retry_config=RetryConfig(max_attempts=2, base_delay=1.0)
+            )
+        return cls._fcm_client
+    
+    @classmethod
+    def get_resend_client(cls) -> ResilientHttpClient:
+        if cls._resend_client is None:
+            cls._resend_client = ResilientHttpClient(
+                base_url="https://api.resend.com",
+                timeout=15.0,
+                circuit_breaker=CircuitBreaker(name="ResendService"),
+                retry_config=RetryConfig(max_attempts=2, base_delay=1.0)
+            )
+        return cls._resend_client
     
     async def send_fcm_notification(self, fcm_tokens: List[str], title: str, body: str, data: dict = None):
         if not self.fcm_server_key or not fcm_tokens:
@@ -30,31 +62,39 @@ class NotificationService:
         }
         
         try:
-            async with httpx.AsyncClient() as client:
-                response = await client.post(
-                    self.fcm_url,
-                    headers=headers,
-                    json=payload
-                )
-                
-                if response.status_code == 200:
-                    result = response.json()
-                    return {
-                        "success": True,
-                        "message": "Notification sent successfully",
-                        "results": result
-                    }
-                else:
-                    return {
-                        "success": False,
-                        "message": f"FCM request failed: {response.status_code}",
-                        "error": response.text
-                    }
+            fcm_client = self.get_fcm_client()
+            response = await fcm_client.post(
+                "/fcm/send",
+                headers=headers,
+                json=payload
+            )
+            
+            if response.status_code == 200:
+                result = response.json()
+                return {
+                    "success": True,
+                    "message": "Notification sent successfully",
+                    "results": result
+                }
+            else:
+                return {
+                    "success": False,
+                    "message": f"FCM request failed: {response.status_code}",
+                    "error": response.text
+                }
         except Exception as e:
-            return {
-                "success": False,
-                "message": f"Failed to send notification: {str(e)}"
-            }
+            # Circuit breaker or network error - use fallback
+            if "Circuit breaker" in str(e):
+                return {
+                    "success": False,
+                    "message": "FCM service temporarily unavailable",
+                    "fallback": True
+                }
+            else:
+                return {
+                    "success": False,
+                    "message": f"Failed to send notification: {str(e)}"
+                }
     
     async def send_order_notification(self, user_id: int, order_id: int, status: str):
         # Mock implementation for demo
@@ -91,31 +131,39 @@ class NotificationService:
         }
         
         try:
-            async with httpx.AsyncClient() as client:
-                response = await client.post(
-                    self.resend_url,
-                    headers=headers,
-                    json=payload
-                )
-                
-                if response.status_code == 200:
-                    result = response.json()
-                    return {
-                        "success": True,
-                        "message": "Invoice email sent successfully",
-                        "email_id": result.get('id')
-                    }
-                else:
-                    return {
-                        "success": False,
-                        "message": f"Resend API failed: {response.status_code}",
-                        "error": response.text
-                    }
+            resend_client = self.get_resend_client()
+            response = await resend_client.post(
+                "/emails",
+                headers=headers,
+                json=payload
+            )
+            
+            if response.status_code == 200:
+                result = response.json()
+                return {
+                    "success": True,
+                    "message": "Invoice email sent successfully",
+                    "email_id": result.get('id')
+                }
+            else:
+                return {
+                    "success": False,
+                    "message": f"Resend API failed: {response.status_code}",
+                    "error": response.text
+                }
         except Exception as e:
-            return {
-                "success": False,
-                "message": f"Failed to send invoice email: {str(e)}"
-            }
+            # Circuit breaker or network error - use fallback
+            if "Circuit breaker" in str(e):
+                return {
+                    "success": False,
+                    "message": "Email service temporarily unavailable",
+                    "fallback": True
+                }
+            else:
+                return {
+                    "success": False,
+                    "message": f"Failed to send invoice email: {str(e)}"
+                }
     
     def _generate_invoice_html(self, order_data: Dict[str, Any]) -> str:
         """Generate HTML invoice template"""

@@ -1,0 +1,37 @@
+groups:
+- name: blinkit-alerts
+  rules:
+  - alert: HighErrorRate
+    annotations:
+      description: Error rate is above 10% for {{ $labels.service }}
+      summary: High error rate detected
+    expr: rate(http_requests_total{status=~"5.."}[5m]) > 0.1
+    for: 2m
+    labels:
+      severity: critical
+  - alert: HighResponseTime
+    annotations:
+      description: 95th percentile response time is above 1s for {{ $labels.service
+        }}
+      summary: High response time detected
+    expr: histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m]))
+      > 1
+    for: 5m
+    labels:
+      severity: warning
+  - alert: ServiceDown
+    annotations:
+      description: '{{ $labels.job }} has been down for more than 1 minute'
+      summary: Service is down
+    expr: up == 0
+    for: 1m
+    labels:
+      severity: critical
+  - alert: HealthCheckFailing
+    annotations:
+      description: Health check for {{ $labels.instance }} has been failing
+      summary: Health check failing
+    expr: probe_success == 0
+    for: 2m
+    labels:
+      severity: warning

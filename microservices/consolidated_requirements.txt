@@ -16,12 +16,21 @@ pydantic-settings
 # HTTP Client
 httpx
 
-# Authentication & Firebase
+# Authentication & Security
 firebase-admin
+python-jose[cryptography]
+passlib[bcrypt]
 
 # Cache & Storage
 redis
 supabase
+
+# Monitoring & Health
+psutil
+
+# Testing
+pytest
+pytest-asyncio
 
 # From auth-service/requirements.txt:
 # fastapi (already included)

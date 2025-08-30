@@ -5,22 +5,70 @@ from ..models.order import Order, OrderItem, OrderStatus
 from ..schemas.order import OrderCreate, OrderResponse
 from datetime import datetime, timedelta
 from fastapi import HTTPException, status
-import httpx
+import sys
+import os
+
+# Add shared modules to path
+sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..', '..', 'shared'))
+
+from http_client import ResilientHttpClient
+from circuit_breaker import CircuitBreaker, RetryConfig
 
 class OrderService:
+    # Initialize resilient HTTP clients for external services
+    _cart_client = None
+    _product_client = None
+    _notification_client = None
+    
+    @classmethod
+    def get_cart_client(cls) -> ResilientHttpClient:
+        if cls._cart_client is None:
+            cls._cart_client = ResilientHttpClient(
+                base_url="http://localhost:8003",
+                timeout=5.0,
+                circuit_breaker=CircuitBreaker(name="CartService"),
+                retry_config=RetryConfig(max_attempts=3, base_delay=0.5)
+            )
+        return cls._cart_client
+    
+    @classmethod
+    def get_product_client(cls) -> ResilientHttpClient:
+        if cls._product_client is None:
+            cls._product_client = ResilientHttpClient(
+                base_url="http://localhost:8002",
+                timeout=5.0,
+                circuit_breaker=CircuitBreaker(name="ProductService"),
+                retry_config=RetryConfig(max_attempts=3, base_delay=0.5)
+            )
+        return cls._product_client
+    
+    @classmethod
+    def get_notification_client(cls) -> ResilientHttpClient:
+        if cls._notification_client is None:
+            cls._notification_client = ResilientHttpClient(
+                base_url="http://localhost:8006",
+                timeout=3.0,  # Shorter timeout for notifications
+                circuit_breaker=CircuitBreaker(name="NotificationService"),
+                retry_config=RetryConfig(max_attempts=2, base_delay=0.3)
+            )
+        return cls._notification_client
+    
     @staticmethod
     async def create_order(db: AsyncSession, user_id: int, order_data: OrderCreate) -> OrderResponse:
-        # Get cart from Cart Service
-        async with httpx.AsyncClient() as client:
-            try:
-                response = await client.get(f"http://localhost:8003/cart?firebase_token=user_{user_id}")
-                if response.status_code != 200:
-                    raise HTTPException(status_code=400, detail="Failed to get cart")
-                
-                cart = response.json()
-                if not cart["items"]:
-                    raise HTTPException(status_code=400, detail="Cart is empty")
-            except Exception as e:
+        # Get cart from Cart Service using resilient client
+        cart_client = OrderService.get_cart_client()
+        try:
+            response = await cart_client.get(f"/cart?firebase_token=user_{user_id}")
+            if response.status_code != 200:
+                raise HTTPException(status_code=400, detail="Failed to get cart")
+            
+            cart = response.json()
+            if not cart["items"]:
+                raise HTTPException(status_code=400, detail="Cart is empty")
+        except Exception as e:
+            if "Circuit breaker" in str(e):
+                raise HTTPException(status_code=503, detail="Cart service temporarily unavailable")
+            else:
                 raise HTTPException(status_code=400, detail="Failed to get cart")
         
         # Calculate totals
@@ -54,21 +102,24 @@ class OrderService:
         await db.commit()
         await db.refresh(order)
         
-        # Clear cart
+        # Clear cart using resilient client
         try:
-            await client.delete(f"http://localhost:8003/cart/clear?firebase_token=user_{user_id}")
-        except:
-            pass  # Continue even if cart clear fails
+            await cart_client.delete(f"/cart/clear?firebase_token=user_{user_id}")
+        except Exception as e:
+            # Log but don't fail order creation if cart clear fails
+            print(f"Warning: Failed to clear cart after order creation: {e}")
         
-        # Send notification
+        # Send notification using resilient client
+        notification_client = OrderService.get_notification_client()
         try:
-            await client.post("http://localhost:8006/notifications/order", json={
+            await notification_client.post("/notifications/order", json={
                 "user_id": user_id,
                 "order_id": order.id,
                 "status": "confirmed"
             })
-        except:
-            pass  # Continue even if notification fails
+        except Exception as e:
+            # Log but don't fail order creation if notification fails
+            print(f"Warning: Failed to send order confirmation notification: {e}")
         
         return await OrderService.get_order_response(db, order.id)
     
@@ -84,28 +135,39 @@ class OrderService:
         if not order:
             raise HTTPException(status_code=404, detail="Order not found")
         
-        # Get product details for each item
+        # Get product details for each item using resilient client
         enriched_items = []
+        product_client = OrderService.get_product_client()
+        
         for item in order.items:
             try:
-                async with httpx.AsyncClient() as client:
-                    response = await client.get(f"http://localhost:8002/products/{item.product_id}")
-                    if response.status_code == 200:
-                        product = response.json()
-                        enriched_items.append({
-                            "id": item.id,
-                            "product_id": item.product_id,
-                            "quantity": item.quantity,
-                            "price": float(item.price),
-                            "product_name": product["name"]
-                        })
-            except:
+                response = await product_client.get(f"/products/{item.product_id}")
+                if response.status_code == 200:
+                    product = response.json()
+                    enriched_items.append({
+                        "id": item.id,
+                        "product_id": item.product_id,
+                        "quantity": item.quantity,
+                        "price": float(item.price),
+                        "product_name": product["name"]
+                    })
+                else:
+                    # Product service error - use fallback
+                    enriched_items.append({
+                        "id": item.id,
+                        "product_id": item.product_id,
+                        "quantity": item.quantity,
+                        "price": float(item.price),
+                        "product_name": "Product Unavailable"
+                    })
+            except Exception as e:
+                # Circuit breaker or network error - use fallback
                 enriched_items.append({
                     "id": item.id,
                     "product_id": item.product_id,
                     "quantity": item.quantity,
                     "price": float(item.price),
-                    "product_name": "Unknown Product"
+                    "product_name": "Product Service Unavailable"
                 })
         
         return OrderResponse(
@@ -156,29 +218,30 @@ class OrderService:
             await db.commit()
             await db.refresh(order)
             
-            # Send notification
+            # Send notification using resilient client
+            notification_client = OrderService.get_notification_client()
             try:
-                async with httpx.AsyncClient() as client:
-                    await client.post("http://localhost:8006/notifications/order", json={
-                        "user_id": order.user_id,
-                        "order_id": order.id,
-                        "status": status.value
+                await notification_client.post("/notifications/order", json={
+                    "user_id": order.user_id,
+                    "order_id": order.id,
+                    "status": status.value
+                })
+                
+                # Send invoice email when order is delivered
+                if status == OrderStatus.DELIVERED:
+                    order_response = await OrderService.get_order_response(db, order.id)
+                    await notification_client.post("/notifications/invoice-email", json={
+                        "user_email": "customer@example.com",  # In real app, get from user table
+                        "order_data": {
+                            "id": order.id,
+                            "total_amount": float(order.total_amount),
+                            "delivery_fee": float(order.delivery_fee),
+                            "delivery_address": order.delivery_address,
+                            "items": order_response.items
+                        }
                     })
-                    
-                    # Send invoice email when order is delivered
-                    if status == OrderStatus.DELIVERED:
-                        order_response = await OrderService.get_order_response(db, order.id)
-                        await client.post("http://localhost:8006/notifications/invoice-email", json={
-                            "user_email": "customer@example.com",  # In real app, get from user table
-                            "order_data": {
-                                "id": order.id,
-                                "total_amount": float(order.total_amount),
-                                "delivery_fee": float(order.delivery_fee),
-                                "delivery_address": order.delivery_address,
-                                "items": order_response.items
-                            }
-                        })
-            except:
-                pass
+            except Exception as e:
+                # Log but don't fail status update if notification fails
+                print(f"Warning: Failed to send order status notification: {e}")
         
         return await OrderService.get_order_response(db, order.id) if order else None
