@@ -90,14 +90,25 @@ async def get_product(product_id: int):
 # Cart endpoints
 @app.get("/cart")
 async def get_cart(firebase_token: str = "demo"):
-    user_id = 1
+    # Extract user ID from token (simplified for demo)
+    if not firebase_token or firebase_token == "demo":
+        raise HTTPException(status_code=401, detail="Invalid or missing token")
+    
+    # In production, validate JWT token and extract user_id
+    user_id = hash(firebase_token) % 1000 + 1  # Simple hash for demo
     cart = mock_carts.get(user_id, {"id": 1, "user_id": user_id, "items": [], "total_amount": 0, "total_items": 0})
     return cart
 
 @app.post("/cart/add")
 async def add_to_cart(request: Request, firebase_token: str = "demo"):
     body = await request.json()
-    user_id = 1
+    
+    # Validate token
+    if not firebase_token or firebase_token == "demo":
+        raise HTTPException(status_code=401, detail="Invalid or missing token")
+    
+    # Extract user ID from token
+    user_id = hash(firebase_token) % 1000 + 1
     product_id = body["product_id"]
     quantity = body.get("quantity", 1)
     
@@ -163,7 +174,12 @@ async def create_order(request: Request, firebase_token: str = "demo"):
 
 @app.get("/orders/my-orders")
 async def get_my_orders(firebase_token: str = "demo"):
-    user_id = 1
+    # Validate token
+    if not firebase_token or firebase_token == "demo":
+        raise HTTPException(status_code=401, detail="Invalid or missing token")
+    
+    # Extract user ID from token
+    user_id = hash(firebase_token) % 1000 + 1
     user_orders = [order for order in mock_orders.values() if order["user_id"] == user_id]
     return user_orders
 

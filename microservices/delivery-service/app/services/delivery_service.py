@@ -82,7 +82,13 @@ class DeliveryService:
                     'longitude': longitude
                 }).execute()
             except Exception as e:
-                print(f"Supabase update failed: {e}")
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.error(f"Supabase update failed: {e}")
+                try:
+                    await db.rollback()
+                except:
+                    pass
         
         return partner
     
@@ -103,5 +109,7 @@ class DeliveryService:
                 return []
         except Exception as e:
             # Circuit breaker or network error - return empty list as fallback
-            print(f"Warning: Failed to get assigned orders from Order Service: {e}")
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.warning(f"Failed to get assigned orders from Order Service: {e}")
             return []

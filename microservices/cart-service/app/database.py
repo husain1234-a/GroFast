@@ -1,36 +1,12 @@
-from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
-from pydantic_settings import BaseSettings
-from typing import List
+import sys
+import os
+sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..', 'shared'))
 
-class Settings(BaseSettings):
-    database_url: str = "postgresql+asyncpg://postgres:password123@localhost:5432/blinkit_db"
-    redis_url: str = "redis://localhost:6379/0"
-    jwt_secret_key: str = "super-secret-jwt-key"
-    jwt_algorithm: str = "HS256"
-    debug: bool = True
-    cors_origins: List[str] = ["*"]
-    
-    class Config:
-        env_file = ".env"
+from database import DatabaseManager, Base
+from .config import settings
 
-settings = Settings()
-
-engine = create_async_engine(
-    "postgresql+asyncpg://postgres:admin123@localhost:5432/grofast_db",
-    echo=False,
-    pool_pre_ping=True,
-    pool_recycle=300
-)
-
-AsyncSessionLocal = async_sessionmaker(
-    engine,
-    class_=AsyncSession,
-    expire_on_commit=False
-)
+db_manager = DatabaseManager(settings.database_url)
 
 async def get_db():
-    async with AsyncSessionLocal() as session:
-        try:
-            yield session
-        finally:
-            await session.close()
+    async for session in db_manager.get_db():
+        yield session

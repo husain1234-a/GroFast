@@ -1,9 +1,7 @@
 from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Numeric, Enum, Boolean
 from sqlalchemy.sql import func
 import enum
-import sys, os
-sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..', '..', 'shared'))
-from database import Base
+from ..database import Base
 
 class DeliveryStatus(enum.Enum):
     AVAILABLE = "available"

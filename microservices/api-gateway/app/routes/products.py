@@ -3,10 +3,11 @@ import sys
 import os
 
 # Add shared modules to path
-sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..', '..', 'shared'))
+shared_path = os.path.join(os.path.dirname(__file__), '..', '..', '..', 'shared')
+sys.path.append(shared_path)
 
 from http_client import ResilientHttpClient
-from circuit_breaker import CircuitBreaker, RetryConfig, CircuitBreakerError
+from custom_circuit_breaker import CircuitBreaker, RetryConfig, CircuitBreakerError
 from ..config import settings
 
 router = APIRouter()

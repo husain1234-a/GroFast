@@ -5,6 +5,10 @@ from fastapi import Request
 import json
 from typing import Dict, Any, Optional
 import re
+import html
+import logging
+
+logger = logging.getLogger(__name__)
 
 class AuditService:
     """Comprehensive audit logging service"""
@@ -135,15 +139,19 @@ class AuditService:
                 
         except Exception as e:
             # Don't let audit logging break the main application
-            print(f"Audit logging failed: {str(e)}")
+            logger.error(f"Audit logging failed: {str(e)}")
+            try:
+                await db.rollback()
+            except:
+                pass
     
     @staticmethod
     async def _send_security_alert(audit_log: AuditLog):
         """Send alert for high-risk security events"""
         # In production, integrate with alerting system (email, Slack, etc.)
-        print(f"🚨 SECURITY ALERT: {audit_log.event_type} - Risk: {audit_log.risk_level}")
-        print(f"   User: {audit_log.user_id}, IP: {audit_log.ip_address}")
-        print(f"   Endpoint: {audit_log.endpoint}, Time: {audit_log.timestamp}")
+        logger.critical(f"SECURITY ALERT: {audit_log.event_type} - Risk: {audit_log.risk_level}")
+        logger.critical(f"User: {audit_log.user_id}, IP: {audit_log.ip_address}")
+        logger.critical(f"Endpoint: {audit_log.endpoint}, Time: {audit_log.timestamp}")
     
     @staticmethod
     async def get_security_events(

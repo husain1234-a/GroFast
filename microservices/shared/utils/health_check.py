@@ -28,11 +28,12 @@ class HealthChecker:
             return {"status": "unhealthy", "error": str(e)}
     
     async def check_redis(self, redis_url: str) -> Dict[str, Any]:
-        """Check Redis connectivity"""
+        """Check Redis connectivity (async)"""
         try:
-            import redis
+            import redis.asyncio as redis
             r = redis.Redis.from_url(redis_url)
-            r.ping()
+            await r.ping()
+            await r.close()
             return {"status": "healthy", "response_time": "< 50ms"}
         except Exception as e:
             return {"status": "unhealthy", "error": str(e)}
@@ -61,10 +62,10 @@ class HealthChecker:
             return {"status": "unhealthy", "error": str(e)}
     
     def get_system_metrics(self) -> Dict[str, Any]:
-        """Get system resource metrics"""
+        """Get system resource metrics (non-blocking)"""
         try:
             return {
-                "cpu_percent": psutil.cpu_percent(interval=1),
+                "cpu_percent": psutil.cpu_percent(),  # Non-blocking call
                 "memory_percent": psutil.virtual_memory().percent,
                 "disk_percent": psutil.disk_usage('/').percent,
                 "load_average": os.getloadavg() if hasattr(os, 'getloadavg') else None

@@ -1,10 +1,6 @@
 from sqlalchemy import Column, Integer, String, Boolean, DateTime, Text
 from sqlalchemy.sql import func
-import sys
-import os
-sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..', '..', 'shared'))
-
-from database import Base
+from ..database import Base
 
 class User(Base):
     __tablename__ = "users"

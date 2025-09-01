@@ -1,34 +1,12 @@
-from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
-from pydantic_settings import BaseSettings
-from typing import List
+import sys
+import os
+sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..', 'shared'))
 
-class DeliveryServiceSettings(BaseSettings):
-    database_url: str = "postgresql+asyncpg://postgres:password123@localhost:5432/blinkit_db"
-    redis_url: str = "redis://localhost:6379/0"
-    supabase_url: str = "https://ktpugnrihesretpdzbkn.supabase.co"
-    supabase_key: str = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imt0cHVnbnJpaGVzcmV0cGR6YmtuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTE3ODYzODAsImV4cCI6MjA2NzM2MjM4MH0.ZLhDDC8b_JUfTvt6yPxl8yk8l4F9DDHNTEWIaBVfQ84"
-    
-    class Config:
-        env_file = ".env"
+from database import DatabaseManager, Base
+from .config import settings
 
-settings = DeliveryServiceSettings()
-
-engine = create_async_engine(
-    "postgresql+asyncpg://postgres:admin123@localhost:5432/grofast_db",
-    echo=False,
-    pool_pre_ping=True,
-    pool_recycle=300
-)
-
-AsyncSessionLocal = async_sessionmaker(
-    engine,
-    class_=AsyncSession,
-    expire_on_commit=False
-)
+db_manager = DatabaseManager(settings.database_url)
 
 async def get_db():
-    async with AsyncSessionLocal() as session:
-        try:
-            yield session
-        finally:
-            await session.close()
+    async for session in db_manager.get_db():
+        yield session

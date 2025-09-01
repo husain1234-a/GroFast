@@ -1,8 +1,6 @@
 from sqlalchemy import Column, Integer, String, Boolean, DateTime, Text, ForeignKey, Numeric
 from sqlalchemy.sql import func
-import sys, os
-sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..', '..', 'shared'))
-from database import Base
+from ..database import Base
 
 class Category(Base):
     __tablename__ = "categories"

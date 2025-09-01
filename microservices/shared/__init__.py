@@ -1,1 +1,1 @@
-# Shared components for GroFast microservices
+# Shared modules for microservices

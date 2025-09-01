@@ -13,6 +13,11 @@ services:
     volumes:
       - auth_db_data:/var/lib/postgresql/data
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U auth_user -d auth_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   product-db:
     image: postgres:15
@@ -25,6 +30,11 @@ services:
     volumes:
       - product_db_data:/var/lib/postgresql/data
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U product_user -d product_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   cart-db:
     image: postgres:15
@@ -37,6 +47,11 @@ services:
     volumes:
       - cart_db_data:/var/lib/postgresql/data
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cart_user -d cart_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   order-db:
     image: postgres:15
@@ -49,6 +64,11 @@ services:
     volumes:
       - order_db_data:/var/lib/postgresql/data
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U order_user -d order_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   delivery-db:
     image: postgres:15
@@ -61,6 +81,28 @@ services:
     volumes:
       - delivery_db_data:/var/lib/postgresql/data
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U delivery_user -d delivery_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  notification-db:
+    image: postgres:15
+    environment:
+      POSTGRES_DB: notification_db
+      POSTGRES_USER: notification_user
+      POSTGRES_PASSWORD: notification_pass123
+    ports:
+      - "5438:5432"
+    volumes:
+      - notification_db_data:/var/lib/postgresql/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U notification_user -d notification_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   redis:
     image: redis:7-alpine
@@ -68,6 +110,11 @@ services:
       - "6379:6379"
     volumes:
       - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
 
   meilisearch:
     image: getmeili/meilisearch:v1.5
@@ -77,6 +124,11 @@ services:
       MEILI_MASTER_KEY: dummy-master-key-123
     volumes:
       - meilisearch_data:/meili_data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:7700/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
 
   # API Gateway
   api-gateway:
@@ -98,10 +150,11 @@ services:
       - auth-service
       - product-service
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health/ready"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
     deploy:
       resources:
         limits:
@@ -122,13 +175,16 @@ services:
       - DATABASE_URL=postgresql+asyncpg://auth_user:auth_pass123@auth-db:5432/auth_db
       - REDIS_URL=redis://redis:6379/0
     depends_on:
-      - auth-db
-      - redis
+      auth-db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
+      test: ["CMD", "curl", "-f", "http://localhost:8001/health/ready"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
 
   # Product Service
   product-service:
@@ -142,13 +198,16 @@ services:
       - MEILISEARCH_URL=http://meilisearch:7700
       - MEILISEARCH_MASTER_KEY=dummy-master-key-123
     depends_on:
-      - product-db
-      - meilisearch
+      product-db:
+        condition: service_healthy
+      meilisearch:
+        condition: service_healthy
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8002/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
+      test: ["CMD", "curl", "-f", "http://localhost:8002/health/ready"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
 
   # Cart Service
   cart-service:
@@ -163,13 +222,16 @@ services:
       - AUTH_SERVICE_URL=http://auth-service:8001
       - PRODUCT_SERVICE_URL=http://product-service:8002
     depends_on:
-      - cart-db
-      - redis
+      cart-db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8003/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
+      test: ["CMD", "curl", "-f", "http://localhost:8003/health/ready"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
 
   # Order Service
   order-service:
@@ -184,12 +246,14 @@ services:
       - CART_SERVICE_URL=http://cart-service:8003
       - NOTIFICATION_SERVICE_URL=http://notification-service:8006
     depends_on:
-      - order-db
+      order-db:
+        condition: service_healthy
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8004/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
+      test: ["CMD", "curl", "-f", "http://localhost:8004/health/ready"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
 
   # Delivery Service
   delivery-service:
@@ -203,12 +267,14 @@ services:
       - SUPABASE_URL=${SUPABASE_URL:-https://ktpugnrihesretpdzbkn.supabase.co}
       - SUPABASE_KEY=${SUPABASE_KEY:-eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imt0cHVnbnJpaGVzcmV0cGR6YmtuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTE3ODYzODAsImV4cCI6MjA2NzM2MjM4MH0.ZLhDDC8b_JUfTvt6yPxl8yk8l4F9DDHNTEWIaBVfQ84}
     depends_on:
-      - delivery-db
+      delivery-db:
+        condition: service_healthy
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8005/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
+      test: ["CMD", "curl", "-f", "http://localhost:8005/health/ready"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
 
   # Notification Service
   notification-service:
@@ -218,15 +284,20 @@ services:
     ports:
       - "8006:8006"
     environment:
+      - DATABASE_URL=postgresql+asyncpg://notification_user:notification_pass123@notification-db:5432/notification_db
       - FCM_SERVER_KEY=${FCM_SERVER_KEY:-AAAA1234567890:APA91bHdummy_fcm_server_key_for_development}
       - REDIS_URL=redis://redis:6379/0
     depends_on:
-      - redis
+      notification-db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8006/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
+      test: ["CMD", "curl", "-f", "http://localhost:8006/health/ready"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
 
 volumes:
   auth_db_data:
@@ -234,5 +305,6 @@ volumes:
   cart_db_data:
   order_db_data:
   delivery_db_data:
+  notification_db_data:
   redis_data:
   meilisearch_data:

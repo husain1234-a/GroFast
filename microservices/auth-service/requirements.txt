@@ -9,3 +9,4 @@ httpx
 python-jose[cryptography]
 redis
 passlib[bcrypt]
+psutil

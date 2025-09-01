@@ -1,7 +1,10 @@
 from fastapi import HTTPException, status
 from typing import Optional, Dict, Any
-from .http_client import ResilientHttpClient
-from .circuit_breaker import CircuitBreaker, RetryConfig, CircuitBreakerError
+import sys
+import os
+sys.path.append(os.path.dirname(__file__))
+from http_client import ResilientHttpClient
+from custom_circuit_breaker import CircuitBreaker, RetryConfig, CircuitBreakerError
 import logging
 
 logger = logging.getLogger(__name__)

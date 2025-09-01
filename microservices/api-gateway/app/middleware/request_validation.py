@@ -129,7 +129,10 @@ class RequestValidationMiddleware(BaseHTTPMiddleware):
             # Validate query parameters
             for param_name, param_value in request.query_params.items():
                 if self._contains_malicious_content(param_value):
-                    logger.warning(f"Malicious content detected in query parameter '{param_name}': {param_value}")
+                    # Sanitize log data to prevent log injection
+                    safe_param = param_name.replace('\n', '').replace('\r', '')
+                    safe_value = str(param_value).replace('\n', '').replace('\r', '')[:100]
+                    logger.warning(f"Malicious content detected in query parameter '{safe_param}': {safe_value}")
                     return JSONResponse(
                         status_code=400,
                         content={
@@ -140,7 +143,9 @@ class RequestValidationMiddleware(BaseHTTPMiddleware):
             
             # Validate path parameters
             if self._contains_malicious_content(str(request.url.path)):
-                logger.warning(f"Malicious content detected in path: {request.url.path}")
+                # Sanitize log data to prevent log injection
+                safe_path = str(request.url.path).replace('\n', '').replace('\r', '')
+                logger.warning(f"Malicious content detected in path: {safe_path}")
                 return JSONResponse(
                     status_code=400,
                     content={

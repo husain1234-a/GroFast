@@ -1,6 +1,6 @@
 import sys, os
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..', 'shared'))
-from database import DatabaseManager
+from database import DatabaseManager, Base
 from .config import settings
 
 db_manager = DatabaseManager(settings.database_url)

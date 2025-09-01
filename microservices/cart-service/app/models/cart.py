@@ -1,9 +1,7 @@
 from sqlalchemy import Column, Integer, DateTime, ForeignKey
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
-import sys, os
-sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..', '..', 'shared'))
-from database import Base
+from ..database import Base
 
 class Cart(Base):
     __tablename__ = "carts"
