@@ -36,6 +36,7 @@ async def get_categories(request: Request):
             "fallback": True
         }
 
+@router.get("")
 @router.get("/")
 async def get_products(request: Request):
     try:
