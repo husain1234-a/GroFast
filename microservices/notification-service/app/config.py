@@ -11,8 +11,8 @@ logger = logging.getLogger(__name__)
 class NotificationServiceSettings(BaseServiceSettings):
     """Notification service configuration with enhanced error handling"""
     
-    # External service keys
-    fcm_server_key: str
+    # External service keys (Firebase Admin SDK replaces FCM server key)
+    firebase_credentials_path: str
     resend_api_key: str
     
     # Notification-specific settings
@@ -29,7 +29,7 @@ class NotificationServiceSettings(BaseServiceSettings):
         """Critical variables required for notification service to function"""
         base_vars = super().get_critical_vars()
         notification_vars = [
-            "fcm_server_key",
+            "firebase_credentials_path",
             "resend_api_key"
         ]
         return base_vars + notification_vars
@@ -50,9 +50,11 @@ class NotificationServiceSettings(BaseServiceSettings):
         """Additional notification-specific validation"""
         super()._post_init_validation()
         
-        # Validate FCM server key format
-        if not self.fcm_server_key.startswith('AAAA'):
-            logger.warning("FCM server key format may be invalid (should start with 'AAAA')")
+        # Validate Firebase credentials file exists
+        if not os.path.exists(self.firebase_credentials_path):
+            logger.warning(f"Firebase credentials file not found: {self.firebase_credentials_path}")
+        else:
+            logger.info("Firebase credentials file found - using Firebase Admin SDK")
         
         # Validate Resend API key format
         if not self.resend_api_key.startswith('re_'):
