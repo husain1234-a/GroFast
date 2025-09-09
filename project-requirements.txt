@@ -1,0 +1,175 @@
+Goal: Generate a Blinkit-inspired grocery delivery web app using Next.js, fully integrated with the GroFast OpenAPI 3.0.3 backend.
+
+Overview
+
+Build a fast, mobile-first, category-driven grocery shopping experience similar to Blinkit, using the provided OpenAPI specification. The frontend must be built with Next.js 14+ (App Router) and reflect Blinkit's clean UX, real-time cart, product grid, and seamless checkout flow.
+
+All API interactions must follow the security and validation rules defined in the spec (Firebase JWT, request/response schemas).
+
+Technical Stack
+
+Framework: Next.js 14+ (App Router)
+Language: TypeScript
+Styling: Tailwind CSS
+State & API: React Query (@tanstack/react-query)
+Forms: React Hook Form + Zod
+Icons: lucide-react
+Routing: next/navigation
+Auth: Firebase JWT via Authorization: Bearer <token>
+
+Project Structure
+
+/app
+  /api              # Auto-generated API client (via Orval)
+  /auth
+    /login
+    /profile
+  /categories
+    /[id]/page.tsx  # Dynamic category/product listing
+  /cart
+    /page.tsx        # Cart view
+    /CartDrawer.tsx  # Slide-up cart UI
+  /orders
+    /my-orders/page.tsx
+    /[id]/page.tsx
+  /delivery
+    /partner/page.tsx
+  layout.tsx         # Main layout with header & navigation
+  page.tsx           # Home: Hero, categories, trending products
+/components
+  /ui               # Reusable components (ShadCN-style)
+  Header.tsx
+  ProductCard.tsx
+  CategoryGrid.tsx
+  FloatingCart.tsx
+  LoadingSkeletons.tsx
+/lib
+  apiClient.ts       # Axios/fetch wrapper with auth
+  queryClient.ts     # React Query client
+/types
+  generated.d.ts     # From OpenAPI (Orval/Refine)
+
+UI/UX Requirements (Blinkit-Like)
+
+Home Page (/)
+- Hero banner with search bar
+- Horizontal scrollable category pills (e.g., Fruits & Vegetables, Snacks, Dairy)
+- "Trending Now" or "Top Picks" product grid (2–3 columns on mobile)
+- Floating mini-cart at bottom-right with item count and total
+
+Category Page (/categories/1)
+- Breadcrumb: Home > Fruits & Vegetables
+- Grid of products (2 per row on mobile, 3 on desktop)
+- Each product shows:
+  - Image
+  - Name
+  - Price (with strikethrough original_price if discounted)
+  - + button → adds to cart; changes to quantity selector after add
+
+Cart (/cart)
+- Persistent floating cart bar at bottom (like Blinkit)
+- Click → opens slide-up drawer (CartDrawer)
+- Shows:
+  - List of items with name, price, quantity (+/– buttons)
+  - Subtotal, delivery fee, total
+  - "Proceed to Checkout" button
+
+Checkout (/orders/create)
+- Form fields:
+  - Delivery address (from auth/me or input)
+  - Time slot dropdown (9-11, 11-13, etc.)
+  - Payment method (cash, card, upi, wallet)
+  - Special instructions (optional)
+- Show order summary
+- On submit → call POST /orders/create
+
+Orders Page (/orders/my-orders)
+- List of past orders
+- Each order shows:
+  - Order number
+  - Status badge (Delivered, Out for Delivery, etc.)
+  - Total amount
+  - Delivery time
+- Click → view details (/orders/12345)
+
+API Integration
+
+Use the OpenAPI 3.0.3 spec to generate a type-safe API client. Recommended tools:
+- Orval → Generate React Query hooks
+- OpenAPI Generator → Generate TypeScript SDK
+
+Key Endpoints to Implement
+
+Purpose | Endpoint | Method
+Login | POST /auth/verify-otp | Firebase token auth
+Profile | GET /auth/me | Get user data
+Update Profile | PUT /auth/me | Update name, address, etc.
+Categories | GET /products/categories | Show top nav
+Products | GET /products | Filter by category, search, price
+Product Detail | GET /products/{id} | Optional modal/popup
+Get Cart | GET /cart | Load cart on mount
+Add to Cart | POST /cart/add | Update quantity
+Remove from Cart | POST /cart/remove | Decrease or remove
+Clear Cart | POST /cart/clear | Empty cart
+Create Order | POST /orders/create | Submit checkout
+My Orders | GET /orders/my-orders | List all orders
+Order Details | GET /orders/{id} | View single order
+Delivery Partner | GET /delivery/me | Dashboard for delivery staff
+Update Location | POST /delivery/location | Real-time GPS tracking
+
+All authenticated endpoints require:
+headers: {
+  'Authorization': `Bearer ${firebaseToken}`
+}
+
+Component Specifications
+
+<ProductCard />
+- Displays product image, name, price, discount
+- "Add +" button → calls useAddToCart()
+- After add → shows quantity selector with +/–
+- Uses ProductResponse schema
+
+<CategoryGrid />
+- Horizontal scrollable list of category pills
+- Each pill shows icon and name
+- Click → navigates to /categories/{id}
+- Uses CategoryResponse
+
+<FloatingCart />
+- Always visible at bottom (mobile-first)
+- Shows total items and amount
+- Click → opens <CartDrawer />
+
+<CartDrawer />
+- Full-width slide-up panel
+- Lists cart items with quantity controls
+- Shows total, delivery fee, final amount
+- "Clear Cart" option
+- "Proceed to Checkout" CTA
+
+<Header />
+- Logo on left
+- Search bar in center (optional)
+- Profile icon on right
+- Cart icon with badge
+
+Validation & Error Handling
+
+- Use Zod for form validation (e.g., address, profile update)
+- Handle API errors using:
+  ErrorResponse: { error, code, details }
+  ValidationErrorResponse: { details.field_errors[] }
+- Show toast or inline messages
+- Handle:
+  - 401 → Redirect to login
+  - 404 → Show "Not Found"
+  - 429 → Rate limit warning
+
+Bonus Features (Nice to Have)
+
+- Dark mode toggle
+- Debounced search bar (/products?search=)
+- PWA support (installable, offline fallback)
+- Address auto-save in profile
+- Order status polling (out_for_delivery → delivered)

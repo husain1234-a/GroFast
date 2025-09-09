@@ -1,0 +1,2116 @@
+openapi: 3.0.3
+info:
+  title: GroFast - Q-Commerce Platform API
+  description: |
+    Ultra-fast grocery delivery platform API documentation with comprehensive validation rules.
+    
+    ## Security
+    - All data is validated using strict patterns and length constraints
+    - Response schemas prevent data leakage with additionalProperties: false
+    - Rate limiting prevents abuse
+    - Firebase JWT authentication for secure access
+    - HTTPS-only transport for bearer tokens
+    
+    ## Authentication
+    All protected endpoints require Firebase ID token in Authorization header:
+    ```
+    Authorization: Bearer <firebase_id_token>
+    ```
+    
+    ## Base URLs
+    - **Production**: `https://api.grofast.com`
+    - **Staging**: `https://staging-api.grofast.com`
+    - **Development**: `https://localhost:8000`
+    
+    ## Rate Limiting
+    - 100 requests per minute per IP
+    - 1000 requests per hour per authenticated user
+    
+    ## Error Responses
+    All endpoints return consistent error format:
+    ```json
+    {
+      "error": "Error message",
+      "code": "ERROR_CODE",
+      "details": {}
+    }
+    ```
+  version: 1.0.0
+  contact:
+    name: GroFast API Support
+    email: api-support@grofast.com
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+
+servers:
+  - url: https://api.grofast.com
+    description: Production server
+  - url: https://staging-api.grofast.com
+    description: Staging server
+  - url: https://localhost:8000
+    description: Development server (HTTPS only)
+
+security:
+  - FirebaseAuth: []
+
+tags:
+  - name: Authentication
+    description: User authentication and profile management
+  - name: Products
+    description: Product catalog and categories
+  - name: Cart
+    description: Shopping cart operations
+  - name: Orders
+    description: Order management and tracking
+  - name: Delivery
+    description: Delivery partner operations
+  - name: Notifications
+    description: Push notifications
+  - name: Admin
+    description: Administrative operations
+
+paths:
+  /auth/verify-otp:
+    post:
+      tags:
+        - Authentication
+      summary: Verify Firebase OTP and authenticate user
+      description: |
+        Verify Firebase ID token and create/login user.
+        
+        **Validation Rules:**
+        - firebase_id_token: Required, must be valid Firebase JWT
+        - Token must not be expired
+        - Token must be from authorized Firebase project
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required:
+                - firebase_id_token
+              properties:
+                firebase_id_token:
+                  type: string
+                  description: Firebase ID token from client SDK
+                  minLength: 100
+                  maxLength: 2000
+                  pattern: '^[A-Za-z0-9\-_]+\.[A-Za-z0-9\-_]+\.[A-Za-z0-9\-_]+$'
+                  example: "eyJhbGciOiJSUzI1NiIsImtpZCI6IjE2NzAyN"
+      responses:
+        '200':
+          description: Authentication successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserResponse'
+        '400':
+          description: Invalid token format
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Token expired or invalid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '406':
+          description: Not Acceptable - Invalid Accept header
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '415':
+          description: Unsupported Media Type
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: Too Many Requests
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Authentication service error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        default:
+          description: Unexpected error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /auth/me:
+    get:
+      tags:
+        - Authentication
+      summary: Get current user profile
+      description: Retrieve authenticated user's profile information
+      security:
+        - FirebaseAuth: []
+      responses:
+        '200':
+          description: User profile retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserResponse'
+        '401':
+          description: Unauthorized - Invalid or missing token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden - Insufficient permissions
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: User not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '406':
+          description: Not Acceptable - Invalid Accept header
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: Too Many Requests
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        default:
+          description: Unexpected error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    
+    put:
+      tags:
+        - Authentication
+      summary: Update user profile
+      description: |
+        Update authenticated user's profile information.
+        
+        **Validation Rules:**
+        - name: 2-50 characters, letters and spaces only
+        - email: Valid email format
+        - phone: 10-15 digits, international format supported
+        - address: 10-200 characters
+        - fcm_token: Valid FCM token format
+      security:
+        - FirebaseAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                name:
+                  type: string
+                  minLength: 2
+                  maxLength: 50
+                  pattern: '^[a-zA-Z\s]+$'
+                  description: Full name (letters and spaces only)
+                  example: "John Doe"
+                email:
+                  type: string
+                  format: email
+                  maxLength: 100
+                  pattern: '^[^\s@]+@[^\s@]+\.[^\s@]+$'
+                  description: Valid email address
+                  example: "john.doe@example.com"
+                phone:
+                  type: string
+                  minLength: 10
+                  maxLength: 15
+                  pattern: '^\+?[1-9]\d{9,14}$'
+                  description: Phone number (10-15 digits, optional country code)
+                  example: "+1234567890"
+                address:
+                  type: string
+                  minLength: 10
+                  maxLength: 200
+                  pattern: '^[a-zA-Z0-9\s,.-]+$'
+                  description: Delivery address
+                  example: "123 Main St, City, State 12345"
+                fcm_token:
+                  type: string
+                  minLength: 100
+                  maxLength: 500
+                  pattern: '^[A-Za-z0-9\-_:]+$'
+                  description: Firebase Cloud Messaging token
+                  example: "dGhpcyBpcyBhIGZha2UgZmNtIHRva2Vu"
+      responses:
+        '200':
+          description: Profile updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserResponse'
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden - Insufficient permissions
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: User not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '406':
+          description: Not Acceptable - Invalid Accept header
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '415':
+          description: Unsupported Media Type
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: Too Many Requests
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        default:
+          description: Unexpected error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /products/categories:
+    get:
+      tags:
+        - Products
+      summary: Get product categories
+      description: Retrieve all active product categories
+      responses:
+        '200':
+          description: Categories retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                properties:
+                  categories:
+                    type: array
+                    maxItems: 100
+                    items:
+                      $ref: '#/components/schemas/CategoryResponse'
+                  fallback:
+                    type: boolean
+                    description: True if fallback data is returned due to service unavailability
+        '406':
+          description: Not Acceptable - Invalid Accept header
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: Too Many Requests
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Service unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        default:
+          description: Unexpected error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /products:
+    get:
+      tags:
+        - Products
+      summary: Get products with filtering and search
+      description: |
+        Retrieve products with optional filtering, searching, and pagination.
+        
+        **Query Parameter Validation:**
+        - page: Integer >= 1, default 1
+        - size: Integer 1-100, default 20
+        - category_id: Integer >= 1
+        - search: 2-50 characters
+        - min_price: Decimal >= 0
+        - max_price: Decimal >= min_price
+        - sort_by: Enum values only
+      parameters:
+        - name: page
+          in: query
+          description: Page number for pagination
+          schema:
+            type: integer
+            format: int32
+            minimum: 1
+            maximum: 1000
+            default: 1
+            example: 1
+        - name: size
+          in: query
+          description: Number of items per page
+          schema:
+            type: integer
+            format: int32
+            minimum: 1
+            maximum: 100
+            default: 20
+            example: 20
+        - name: category_id
+          in: query
+          description: Filter by category ID
+          schema:
+            type: integer
+            format: int32
+            minimum: 1
+            maximum: 999999
+            example: 1
+        - name: search
+          in: query
+          description: Search term for product name/description
+          schema:
+            type: string
+            minLength: 2
+            maxLength: 50
+            pattern: '^[a-zA-Z0-9\s\-_]+$'
+            example: "organic apple"
+        - name: min_price
+          in: query
+          description: Minimum price filter
+          schema:
+            type: number
+            format: decimal
+            minimum: 0
+            maximum: 99999.99
+            multipleOf: 0.01
+            example: 10.50
+        - name: max_price
+          in: query
+          description: Maximum price filter
+          schema:
+            type: number
+            format: decimal
+            minimum: 0
+            maximum: 99999.99
+            multipleOf: 0.01
+            example: 100.00
+        - name: sort_by
+          in: query
+          description: Sort products by field
+          schema:
+            type: string
+            enum: [name, price, created_at, popularity]
+            default: created_at
+            example: price
+        - name: sort_order
+          in: query
+          description: Sort order
+          schema:
+            type: string
+            enum: [asc, desc]
+            default: desc
+            example: asc
+      responses:
+        '200':
+          description: Products retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                properties:
+                  products:
+                    type: array
+                    maxItems: 100
+                    items:
+                      $ref: '#/components/schemas/ProductResponse'
+                  total:
+                    type: integer
+                    format: int32
+                    minimum: 0
+                    maximum: 999999
+                    description: Total number of products matching criteria
+                    example: 150
+                  page:
+                    type: integer
+                    format: int32
+                    minimum: 1
+                    maximum: 1000
+                    description: Current page number
+                    example: 1
+                  size:
+                    type: integer
+                    format: int32
+                    minimum: 1
+                    maximum: 100
+                    description: Items per page
+                    example: 20
+                  total_pages:
+                    type: integer
+                    format: int32
+                    minimum: 0
+                    maximum: 10000
+                    description: Total number of pages
+                    example: 8
+                  fallback:
+                    type: boolean
+                    description: True if fallback data is returned
+        '400':
+          description: Invalid query parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationErrorResponse'
+        '406':
+          description: Not Acceptable - Invalid Accept header
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: Too Many Requests
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        default:
+          description: Unexpected error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /products/{product_id}:
+    get:
+      tags:
+        - Products
+      summary: Get product details
+      description: |
+        Retrieve detailed information about a specific product.
+        
+        **Path Parameter Validation:**
+        - product_id: Integer >= 1
+      parameters:
+        - name: product_id
+          in: path
+          required: true
+          description: Product ID
+          schema:
+            type: integer
+            format: int32
+            minimum: 1
+            maximum: 999999
+            example: 123
+      responses:
+        '200':
+          description: Product details retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProductResponse'
+        '404':
+          description: Product not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '406':
+          description: Not Acceptable - Invalid Accept header
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: Too Many Requests
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        default:
+          description: Unexpected error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /cart:
+    get:
+      tags:
+        - Cart
+      summary: Get user's cart
+      description: Retrieve current user's shopping cart with all items
+      security:
+        - FirebaseAuth: []
+      responses:
+        '200':
+          description: Cart retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CartResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden - Insufficient permissions
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Cart not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '406':
+          description: Not Acceptable - Invalid Accept header
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: Too Many Requests
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        default:
+          description: Unexpected error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /cart/add:
+    post:
+      tags:
+        - Cart
+      summary: Add item to cart
+      description: |
+        Add a product to the user's cart or update quantity if already exists.
+        
+        **Validation Rules:**
+        - product_id: Required, integer >= 1, must exist in catalog
+        - quantity: Integer 1-99, default 1
+        - System validates product availability and stock
+      security:
+        - FirebaseAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required:
+                - product_id
+              properties:
+                product_id:
+                  type: integer
+                  format: int32
+                  minimum: 1
+                  maximum: 999999
+                  description: ID of the product to add
+                  example: 123
+                quantity:
+                  type: integer
+                  format: int32
+                  minimum: 1
+                  maximum: 99
+                  default: 1
+                  description: Quantity to add to cart
+                  example: 2
+      responses:
+        '200':
+          description: Item added to cart successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CartResponse'
+        '400':
+          description: Validation error or insufficient stock
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden - Insufficient permissions
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Product not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '406':
+          description: Not Acceptable - Invalid Accept header
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '415':
+          description: Unsupported Media Type
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: Too Many Requests
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        default:
+          description: Unexpected error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /cart/remove:
+    post:
+      tags:
+        - Cart
+      summary: Remove item from cart
+      description: |
+        Remove a product from the user's cart or decrease quantity.
+        
+        **Validation Rules:**
+        - product_id: Required, integer >= 1
+        - quantity: Optional, integer 1-99, removes all if not specified
+      security:
+        - FirebaseAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required:
+                - product_id
+              properties:
+                product_id:
+                  type: integer
+                  format: int32
+                  minimum: 1
+                  maximum: 999999
+                  description: ID of the product to remove
+                  example: 123
+                quantity:
+                  type: integer
+                  format: int32
+                  minimum: 1
+                  maximum: 99
+                  description: Quantity to remove (removes all if not specified)
+                  example: 1
+      responses:
+        '200':
+          description: Item removed from cart successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CartResponse'
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden - Insufficient permissions
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Product not found in cart
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '406':
+          description: Not Acceptable - Invalid Accept header
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '415':
+          description: Unsupported Media Type
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: Too Many Requests
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        default:
+          description: Unexpected error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /cart/clear:
+    post:
+      tags:
+        - Cart
+      summary: Clear entire cart
+      description: Remove all items from the user's cart
+      security:
+        - FirebaseAuth: []
+      responses:
+        '200':
+          description: Cart cleared successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                properties:
+                  message:
+                    type: string
+                    minLength: 1
+                    maxLength: 100
+                    pattern: '^[a-zA-Z0-9\s,.-]+$'
+                    example: "Cart cleared successfully"
+                  cart:
+                    $ref: '#/components/schemas/CartResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden - Insufficient permissions
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Cart not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '406':
+          description: Not Acceptable - Invalid Accept header
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: Too Many Requests
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        default:
+          description: Unexpected error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /orders/create:
+    post:
+      tags:
+        - Orders
+      summary: Create order from cart
+      description: |
+        Create a new order from the user's current cart items.
+        
+        **Validation Rules:**
+        - delivery_address: Required, 10-200 characters
+        - delivery_time_slot: Required, valid time slot ID
+        - payment_method: Required, enum values only
+        - special_instructions: Optional, max 500 characters
+      security:
+        - FirebaseAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required:
+                - delivery_address
+                - delivery_time_slot
+                - payment_method
+              properties:
+                delivery_address:
+                  type: string
+                  minLength: 10
+                  maxLength: 200
+                  pattern: '^[a-zA-Z0-9\s,.-]+$'
+                  description: Full delivery address
+                  example: "123 Main St, Apt 4B, City, State 12345"
+                delivery_time_slot:
+                  type: string
+                  enum: ["9-11", "11-13", "13-15", "15-17", "17-19", "19-21"]
+                  description: Preferred delivery time slot
+                  example: "15-17"
+                payment_method:
+                  type: string
+                  enum: ["cash", "card", "upi", "wallet"]
+                  description: Payment method
+                  example: "card"
+                special_instructions:
+                  type: string
+                  maxLength: 500
+                  pattern: '^[a-zA-Z0-9\s,.-]*$'
+                  description: Special delivery instructions
+                  example: "Ring doorbell twice"
+      responses:
+        '201':
+          description: Order created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderResponse'
+        '400':
+          description: Validation error or empty cart
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden - Insufficient permissions
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Cart not found or empty
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '406':
+          description: Not Acceptable - Invalid Accept header
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '415':
+          description: Unsupported Media Type
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: Too Many Requests
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        default:
+          description: Unexpected error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /orders/my-orders:
+    get:
+      tags:
+        - Orders
+      summary: Get user's orders
+      description: |
+        Retrieve all orders for the authenticated user with pagination.
+        
+        **Query Parameter Validation:**
+        - page: Integer >= 1, default 1
+        - size: Integer 1-50, default 10
+        - status: Optional status filter
+      security:
+        - FirebaseAuth: []
+      parameters:
+        - name: page
+          in: query
+          description: Page number for pagination
+          schema:
+            type: integer
+            format: int32
+            minimum: 1
+            maximum: 1000
+            default: 1
+            example: 1
+        - name: size
+          in: query
+          description: Number of orders per page
+          schema:
+            type: integer
+            format: int32
+            minimum: 1
+            maximum: 50
+            default: 10
+            example: 10
+        - name: status
+          in: query
+          description: Filter by order status
+          schema:
+            type: string
+            enum: ["pending", "confirmed", "preparing", "out_for_delivery", "delivered", "cancelled"]
+            example: "confirmed"
+      responses:
+        '200':
+          description: Orders retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                properties:
+                  orders:
+                    type: array
+                    maxItems: 50
+                    items:
+                      $ref: '#/components/schemas/OrderResponse'
+                  total:
+                    type: integer
+                    format: int32
+                    minimum: 0
+                    maximum: 999999
+                    description: Total number of orders
+                    example: 25
+                  page:
+                    type: integer
+                    format: int32
+                    minimum: 1
+                    maximum: 1000
+                    description: Current page number
+                    example: 1
+                  size:
+                    type: integer
+                    format: int32
+                    minimum: 1
+                    maximum: 50
+                    description: Orders per page
+                    example: 10
+                  total_pages:
+                    type: integer
+                    format: int32
+                    minimum: 0
+                    maximum: 10000
+                    description: Total number of pages
+                    example: 3
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden - Insufficient permissions
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '406':
+          description: Not Acceptable - Invalid Accept header
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: Too Many Requests
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        default:
+          description: Unexpected error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /orders/{order_id}:
+    get:
+      tags:
+        - Orders
+      summary: Get order details
+      description: |
+        Retrieve detailed information about a specific order.
+        
+        **Path Parameter Validation:**
+        - order_id: Integer >= 1
+      security:
+        - FirebaseAuth: []
+      parameters:
+        - name: order_id
+          in: path
+          required: true
+          description: Order ID
+          schema:
+            type: integer
+            format: int32
+            minimum: 1
+            maximum: 999999999
+            example: 12345
+      responses:
+        '200':
+          description: Order details retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden - Access denied to this order
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Order not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '406':
+          description: Not Acceptable - Invalid Accept header
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: Too Many Requests
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        default:
+          description: Unexpected error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /orders/{order_id}/status:
+    put:
+      tags:
+        - Orders
+      summary: Update order status
+      description: |
+        Update the status of an order (admin/delivery partner only).
+        
+        **Validation Rules:**
+        - status: Required, valid enum value
+        - notes: Optional, max 500 characters
+      security:
+        - FirebaseAuth: []
+      parameters:
+        - name: order_id
+          in: path
+          required: true
+          description: Order ID
+          schema:
+            type: integer
+            format: int32
+            minimum: 1
+            maximum: 999999999
+            example: 12345
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required:
+                - status
+              properties:
+                status:
+                  type: string
+                  enum: ["confirmed", "preparing", "out_for_delivery", "delivered", "cancelled"]
+                  description: New order status
+                  example: "confirmed"
+                notes:
+                  type: string
+                  maxLength: 500
+                  pattern: '^[a-zA-Z0-9\s,.-]*$'
+                  description: Status update notes
+                  example: "Order confirmed and being prepared"
+      responses:
+        '200':
+          description: Order status updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderResponse'
+        '400':
+          description: Invalid status transition
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden - Insufficient permissions
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Order not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '406':
+          description: Not Acceptable - Invalid Accept header
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '415':
+          description: Unsupported Media Type
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: Too Many Requests
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        default:
+          description: Unexpected error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /delivery/me:
+    get:
+      tags:
+        - Delivery
+      summary: Get delivery partner profile
+      description: Retrieve authenticated delivery partner's profile and statistics
+      security:
+        - FirebaseAuth: []
+      responses:
+        '200':
+          description: Delivery partner profile retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeliveryPartnerResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden - Not a delivery partner
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Delivery partner not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '406':
+          description: Not Acceptable - Invalid Accept header
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: Too Many Requests
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        default:
+          description: Unexpected error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /delivery/status:
+    put:
+      tags:
+        - Delivery
+      summary: Update delivery partner availability
+      description: |
+        Update delivery partner's availability status.
+        
+        **Validation Rules:**
+        - is_available: Required boolean
+        - current_location: Required when going online
+      security:
+        - FirebaseAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required:
+                - is_available
+              properties:
+                is_available:
+                  type: boolean
+                  description: Availability status
+                  example: true
+                current_location:
+                  type: object
+                  additionalProperties: false
+                  properties:
+                    latitude:
+                      type: number
+                      format: double
+                      minimum: -90
+                      maximum: 90
+                      description: Current latitude
+                      example: 40.7128
+                    longitude:
+                      type: number
+                      format: double
+                      minimum: -180
+                      maximum: 180
+                      description: Current longitude
+                      example: -74.0060
+      responses:
+        '200':
+          description: Status updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeliveryPartnerResponse'
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden - Not a delivery partner
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Delivery partner not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '406':
+          description: Not Acceptable - Invalid Accept header
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '415':
+          description: Unsupported Media Type
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: Too Many Requests
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        default:
+          description: Unexpected error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /delivery/location:
+    post:
+      tags:
+        - Delivery
+      summary: Update GPS location
+      description: |
+        Update delivery partner's real-time GPS location during delivery.
+        
+        **Validation Rules:**
+        - latitude: Required, valid GPS coordinate
+        - longitude: Required, valid GPS coordinate
+        - order_id: Optional, current delivery order
+      security:
+        - FirebaseAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required:
+                - latitude
+                - longitude
+              properties:
+                latitude:
+                  type: number
+                  format: double
+                  minimum: -90
+                  maximum: 90
+                  description: Current latitude
+                  example: 40.7128
+                longitude:
+                  type: number
+                  format: double
+                  minimum: -180
+                  maximum: 180
+                  description: Current longitude
+                  example: -74.0060
+                order_id:
+                  type: integer
+                  format: int32
+                  minimum: 1
+                  maximum: 999999999
+                  description: Current delivery order ID
+                  example: 12345
+      responses:
+        '200':
+          description: Location updated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                properties:
+                  message:
+                    type: string
+                    minLength: 1
+                    maxLength: 100
+                    pattern: '^[a-zA-Z0-9\s,.-]+$'
+                    example: "Location updated successfully"
+                  timestamp:
+                    type: string
+                    format: date-time
+                    pattern: '^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$'
+                    example: "2024-01-15T12:30:00Z"
+        '400':
+          description: Invalid GPS coordinates
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden - Not a delivery partner
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Delivery partner not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '406':
+          description: Not Acceptable - Invalid Accept header
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '415':
+          description: Unsupported Media Type
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: Too Many Requests
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        default:
+          description: Unexpected error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+components:
+  securitySchemes:
+    FirebaseAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Firebase ID token (HTTPS transport required)
+
+  schemas:
+    UserResponse:
+      type: object
+      additionalProperties: false
+      properties:
+        id:
+          type: integer
+          format: int32
+          minimum: 1
+          maximum: 999999999
+          example: 123
+        firebase_uid:
+          type: string
+          minLength: 10
+          maxLength: 50
+          pattern: '^[a-zA-Z0-9_-]+$'
+          example: "firebase_user_123"
+        email:
+          type: string
+          format: email
+          maxLength: 100
+          pattern: '^[^\s@]+@[^\s@]+\.[^\s@]+$'
+          example: "user@example.com"
+        name:
+          type: string
+          minLength: 2
+          maxLength: 50
+          pattern: '^[a-zA-Z\s]+$'
+          example: "John Doe"
+        phone:
+          type: string
+          minLength: 10
+          maxLength: 15
+          pattern: '^\+?[1-9]\d{9,14}$'
+          example: "+1234567890"
+        address:
+          type: string
+          minLength: 10
+          maxLength: 200
+          pattern: '^[a-zA-Z0-9\s,.-]+$'
+          example: "123 Main St, City, State 12345"
+        fcm_token:
+          type: string
+          minLength: 100
+          maxLength: 500
+          pattern: '^[A-Za-z0-9\-_:]+$'
+          example: "fcm_token_here"
+        is_active:
+          type: boolean
+          example: true
+        created_at:
+          type: string
+          format: date-time
+          pattern: '^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$'
+          example: "2024-01-15T10:30:00Z"
+
+    CategoryResponse:
+      type: object
+      additionalProperties: false
+      properties:
+        id:
+          type: integer
+          format: int32
+          minimum: 1
+          maximum: 999999
+          example: 1
+        name:
+          type: string
+          minLength: 2
+          maxLength: 50
+          pattern: '^[a-zA-Z0-9\s&-]+$'
+          example: "Fruits & Vegetables"
+        description:
+          type: string
+          maxLength: 200
+          pattern: '^[a-zA-Z0-9\s,.-]+$'
+          example: "Fresh fruits and vegetables"
+        image_url:
+          type: string
+          format: uri
+          maxLength: 500
+          pattern: '^https://[^\s]+$'
+          example: "https://cdn.grofast.com/categories/fruits.jpg"
+        is_active:
+          type: boolean
+          example: true
+
+    ProductResponse:
+      type: object
+      additionalProperties: false
+      properties:
+        id:
+          type: integer
+          format: int32
+          minimum: 1
+          maximum: 999999
+          example: 123
+        name:
+          type: string
+          minLength: 2
+          maxLength: 100
+          pattern: '^[a-zA-Z0-9\s-]+$'
+          example: "Organic Red Apples"
+        description:
+          type: string
+          maxLength: 1000
+          pattern: '^[a-zA-Z0-9\s,.-]+$'
+          example: "Fresh organic red apples"
+        price:
+          type: number
+          format: decimal
+          minimum: 0.01
+          maximum: 99999.99
+          example: 4.99
+        original_price:
+          type: number
+          format: decimal
+          minimum: 0.01
+          maximum: 99999.99
+          example: 5.99
+        discount_percentage:
+          type: number
+          format: decimal
+          minimum: 0
+          maximum: 100
+          example: 16.67
+        stock_quantity:
+          type: integer
+          format: int32
+          minimum: 0
+          maximum: 99999
+          example: 100
+        unit:
+          type: string
+          enum: [kg, g, l, ml, piece, pack, dozen]
+          example: "kg"
+        image_url:
+          type: string
+          format: uri
+          maxLength: 500
+          pattern: '^https://[^\s]+$'
+          example: "https://cdn.grofast.com/products/apples.jpg"
+        category_id:
+          type: integer
+          format: int32
+          minimum: 1
+          maximum: 999999
+          example: 1
+        category:
+          $ref: '#/components/schemas/CategoryResponse'
+        is_active:
+          type: boolean
+          example: true
+        created_at:
+          type: string
+          format: date-time
+          pattern: '^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$'
+          example: "2024-01-15T10:30:00Z"
+
+    CartItemResponse:
+      type: object
+      additionalProperties: false
+      properties:
+        id:
+          type: integer
+          format: int32
+          minimum: 1
+          maximum: 999999999
+          example: 456
+        product_id:
+          type: integer
+          format: int32
+          minimum: 1
+          maximum: 999999
+          example: 123
+        quantity:
+          type: integer
+          format: int32
+          minimum: 1
+          maximum: 99
+          example: 2
+        price:
+          type: number
+          format: decimal
+          minimum: 0.01
+          maximum: 99999.99
+          example: 4.99
+        total_price:
+          type: number
+          format: decimal
+          minimum: 0.01
+          maximum: 9999999.99
+          example: 9.98
+        product_name:
+          type: string
+          minLength: 2
+          maxLength: 100
+          pattern: '^[a-zA-Z0-9\s-]+$'
+          example: "Organic Red Apples"
+        product_image:
+          type: string
+          format: uri
+          maxLength: 500
+          pattern: '^https://[^\s]+$'
+          example: "https://cdn.grofast.com/products/apples.jpg"
+
+    CartResponse:
+      type: object
+      additionalProperties: false
+      properties:
+        id:
+          type: integer
+          format: int32
+          minimum: 1
+          maximum: 999999999
+          example: 789
+        user_id:
+          type: integer
+          format: int32
+          minimum: 1
+          maximum: 999999999
+          example: 123
+        items:
+          type: array
+          maxItems: 100
+          items:
+            $ref: '#/components/schemas/CartItemResponse'
+        total_amount:
+          type: number
+          format: decimal
+          minimum: 0
+          maximum: 9999999.99
+          example: 29.94
+        total_items:
+          type: integer
+          format: int32
+          minimum: 0
+          maximum: 9999
+          example: 6
+        created_at:
+          type: string
+          format: date-time
+          pattern: '^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$'
+          example: "2024-01-15T10:30:00Z"
+        updated_at:
+          type: string
+          format: date-time
+          pattern: '^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$'
+          example: "2024-01-15T11:45:00Z"
+
+    OrderItemResponse:
+      type: object
+      additionalProperties: false
+      properties:
+        id:
+          type: integer
+          format: int32
+          minimum: 1
+          maximum: 999999999
+          example: 789
+        product_id:
+          type: integer
+          format: int32
+          minimum: 1
+          maximum: 999999
+          example: 123
+        product_name:
+          type: string
+          minLength: 2
+          maxLength: 100
+          pattern: '^[a-zA-Z0-9\s-]+$'
+          example: "Organic Red Apples"
+        quantity:
+          type: integer
+          format: int32
+          minimum: 1
+          maximum: 99
+          example: 2
+        price:
+          type: number
+          format: decimal
+          minimum: 0.01
+          maximum: 99999.99
+          example: 4.99
+        total_price:
+          type: number
+          format: decimal
+          minimum: 0.01
+          maximum: 9999999.99
+          example: 9.98
+
+    OrderResponse:
+      type: object
+      additionalProperties: false
+      properties:
+        id:
+          type: integer
+          format: int32
+          minimum: 1
+          maximum: 999999999
+          example: 12345
+        user_id:
+          type: integer
+          format: int32
+          minimum: 1
+          maximum: 999999999
+          example: 123
+        order_number:
+          type: string
+          minLength: 8
+          maxLength: 20
+          pattern: '^[A-Z0-9-]+$'
+          example: "ORD-2024-001234"
+        status:
+          type: string
+          enum: ["pending", "confirmed", "preparing", "out_for_delivery", "delivered", "cancelled"]
+          example: "confirmed"
+        items:
+          type: array
+          maxItems: 100
+          items:
+            $ref: '#/components/schemas/OrderItemResponse'
+        total_amount:
+          type: number
+          format: decimal
+          minimum: 0.01
+          maximum: 9999999.99
+          example: 29.94
+        delivery_fee:
+          type: number
+          format: decimal
+          minimum: 0
+          maximum: 999.99
+          example: 2.99
+        tax_amount:
+          type: number
+          format: decimal
+          minimum: 0
+          maximum: 99999.99
+          example: 2.40
+        final_amount:
+          type: number
+          format: decimal
+          minimum: 0.01
+          maximum: 9999999.99
+          example: 35.33
+        delivery_address:
+          type: string
+          minLength: 10
+          maxLength: 200
+          pattern: '^[a-zA-Z0-9\s,.-]+$'
+          example: "123 Main St, Apt 4B, City, State 12345"
+        delivery_time_slot:
+          type: string
+          enum: ["9-11", "11-13", "13-15", "15-17", "17-19", "19-21"]
+          example: "15-17"
+        payment_method:
+          type: string
+          enum: ["cash", "card", "upi", "wallet"]
+          example: "card"
+        payment_status:
+          type: string
+          enum: ["pending", "paid", "failed", "refunded"]
+          example: "paid"
+        special_instructions:
+          type: string
+          maxLength: 500
+          pattern: '^[a-zA-Z0-9\s,.-]*$'
+          example: "Ring doorbell twice"
+        delivery_partner_id:
+          type: integer
+          format: int32
+          minimum: 1
+          maximum: 999999999
+          nullable: true
+          example: 456
+        estimated_delivery_time:
+          type: string
+          format: date-time
+          pattern: '^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$'
+          example: "2024-01-15T16:30:00Z"
+        actual_delivery_time:
+          type: string
+          format: date-time
+          pattern: '^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$'
+          nullable: true
+          example: "2024-01-15T16:25:00Z"
+        created_at:
+          type: string
+          format: date-time
+          pattern: '^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$'
+          example: "2024-01-15T14:30:00Z"
+        updated_at:
+          type: string
+          format: date-time
+          pattern: '^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$'
+          example: "2024-01-15T15:45:00Z"
+
+    DeliveryPartnerResponse:
+      type: object
+      additionalProperties: false
+      properties:
+        id:
+          type: integer
+          format: int32
+          minimum: 1
+          maximum: 999999999
+          example: 456
+        user_id:
+          type: integer
+          format: int32
+          minimum: 1
+          maximum: 999999999
+          example: 123
+        name:
+          type: string
+          minLength: 2
+          maxLength: 50
+          pattern: '^[a-zA-Z\s]+$'
+          example: "John Delivery"
+        phone:
+          type: string
+          minLength: 10
+          maxLength: 15
+          pattern: '^\+?[1-9]\d{9,14}$'
+          example: "+1234567890"
+        vehicle_type:
+          type: string
+          enum: ["bike", "scooter", "car", "bicycle"]
+          example: "bike"
+        vehicle_number:
+          type: string
+          minLength: 5
+          maxLength: 15
+          pattern: '^[A-Z0-9\s-]+$'
+          example: "ABC-1234"
+        is_available:
+          type: boolean
+          example: true
+        is_active:
+          type: boolean
+          example: true
+        current_location:
+          type: object
+          additionalProperties: false
+          nullable: true
+          properties:
+            latitude:
+              type: number
+              format: double
+              minimum: -90
+              maximum: 90
+              example: 40.7128
+            longitude:
+              type: number
+              format: double
+              minimum: -180
+              maximum: 180
+              example: -74.0060
+            updated_at:
+              type: string
+              format: date-time
+              pattern: '^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$'
+              example: "2024-01-15T12:30:00Z"
+        rating:
+          type: number
+          format: decimal
+          minimum: 0
+          maximum: 5
+          example: 4.8
+        total_deliveries:
+          type: integer
+          format: int32
+          minimum: 0
+          maximum: 999999
+          example: 1250
+        earnings_today:
+          type: number
+          format: decimal
+          minimum: 0
+          maximum: 99999.99
+          example: 450.75
+        earnings_this_month:
+          type: number
+          format: decimal
+          minimum: 0
+          maximum: 999999.99
+          example: 12500.50
+        created_at:
+          type: string
+          format: date-time
+          pattern: '^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$'
+          example: "2024-01-01T10:00:00Z"
+        updated_at:
+          type: string
+          format: date-time
+          pattern: '^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$'
+          example: "2024-01-15T12:30:00Z"
+
+    ErrorResponse:
+      type: object
+      additionalProperties: false
+      properties:
+        error:
+          type: string
+          minLength: 1
+          maxLength: 200
+          pattern: '^[a-zA-Z0-9\s,.-]+$'
+          description: Error message
+          example: "Resource not found"
+        code:
+          type: string
+          minLength: 1
+          maxLength: 50
+          pattern: '^[A-Z_]+$'
+          description: Error code
+          example: "RESOURCE_NOT_FOUND"
+        details:
+          type: object
+          additionalProperties: false
+          description: Additional error details
+
+    ValidationErrorResponse:
+      type: object
+      additionalProperties: false
+      properties:
+        error:
+          type: string
+          minLength: 1
+          maxLength: 200
+          pattern: '^[a-zA-Z0-9\s,.-]+$'
+          description: Validation error message
+          example: "Validation failed"
+        code:
+          type: string
+          minLength: 1
+          maxLength: 50
+          pattern: '^[A-Z_]+$'
+          description: Error code
+          example: "VALIDATION_ERROR"
+        details:
+          type: object
+          additionalProperties: false
+          properties:
+            field_errors:
+              type: array
+              maxItems: 50
+              items:
+                type: object
+                additionalProperties: false
+                properties:
+                  field:
+                    type: string
+                    minLength: 1
+                    maxLength: 50
+                    pattern: '^[a-zA-Z_]+$'
+                    example: "email"
+                  message:
+                    type: string
+                    minLength: 1
+                    maxLength: 200
+                    pattern: '^[a-zA-Z0-9\s,.-]+$'
+                    example: "Invalid email format"
+                  code:
+                    type: string
+                    minLength: 1
+                    maxLength: 50
+                    pattern: '^[A-Z_]+$'
+                    example: "INVALID_FORMAT"
