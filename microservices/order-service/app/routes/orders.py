@@ -1,12 +1,13 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Query, Header
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, func
 from sqlalchemy.orm import selectinload
 from typing import List
 from ..database import get_db
 from ..models.order import Order, OrderStatus
 from ..schemas.order import OrderCreate, OrderResponse, OrderStatusUpdate
 from ..services.order_service import OrderService
+import httpx
 import sys
 import os
 
@@ -34,6 +35,30 @@ async def create_order(
     """Create order from cart"""
     logger.info(f"Creating order for user {user_id}")
     order = await OrderService.create_order(db, user_id, order_data)
+    
+    # Clear user's cart after successful order creation
+    try:
+        async with httpx.AsyncClient() as client:
+            await client.delete(f"http://cart-service:8000/cart/{user_id}/clear")
+        logger.info(f"Cart cleared for user {user_id}")
+    except Exception as e:
+        logger.error(f"Failed to clear cart: {e}")
+    
+    # Send order created notification
+    try:
+        async with httpx.AsyncClient() as client:
+            await client.post(
+                "http://notification-service:8000/notifications/order-status",
+                json={
+                    "user_id": user_id,
+                    "order_id": order.id,
+                    "status": "order_created"
+                }
+            )
+        logger.info(f"Order notification sent for order {order.id}")
+    except Exception as e:
+        logger.error(f"Failed to send order notification: {e}")
+    
     logger.info(f"Order {order.id} created for user {user_id}")
     return order
 
@@ -87,5 +112,52 @@ async def update_order_status(
     """Update order status (admin/delivery partner only)"""
     logger.info(f"Updating order {order_id} status to {status_update.status}")
     order = await OrderService.update_order_status(db, order_id, status_update.status)
+    
+    # Send status update notification
+    try:
+        async with httpx.AsyncClient() as client:
+            await client.post(
+                "http://notification-service:8000/notifications/order-status",
+                json={
+                    "user_id": order.user_id,
+                    "order_id": order_id,
+                    "status": status_update.status.value
+                }
+            )
+        logger.info(f"Status update notification sent for order {order_id}")
+    except Exception as e:
+        logger.error(f"Failed to send status update notification: {e}")
+    
     logger.info(f"Order {order_id} status updated to {status_update.status}")
     return order
+
+@router.get("/count")
+async def get_orders_count(db: AsyncSession = Depends(get_db)):
+    """Get total count of orders"""
+    result = await db.execute(select(func.count(Order.id)))
+    return {"count": result.scalar()}
+
+# Admin endpoints
+async def verify_admin(x_admin_key: str = Header(...)):
+    """Verify admin API key"""
+    if x_admin_key != "admin_secret_key":
+        raise HTTPException(status_code=403, detail="Admin access required")
+
+@router.get("/admin/orders", response_model=List[OrderResponse])
+async def get_all_orders_admin(
+    limit: int = Query(50, le=100),
+    offset: int = Query(0, ge=0),
+    db: AsyncSession = Depends(get_db),
+    _: None = Depends(verify_admin)
+):
+    """Admin endpoint to get all orders"""
+    logger.info(f"Admin fetching all orders - limit: {limit}, offset: {offset}")
+    result = await db.execute(
+        select(Order).options(
+            selectinload(Order.items)
+        ).order_by(Order.created_at.desc())
+        .offset(offset).limit(limit)
+    )
+    orders = result.scalars().all()
+    logger.info(f"Admin found {len(orders)} orders")
+    return [OrderResponse.model_validate(order) for order in orders]
