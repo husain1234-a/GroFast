@@ -58,6 +58,13 @@ logs/
 firebase-credentials.json
 *-firebase-adminsdk-*.json
 
+# Code Comparison
+*_complete_code.txt
+code-comparisons/
+
+# codacy
+*codacy.instructions.md
+
 # Environment variables
 .env.local
 .env.production
@@ -102,3 +109,6 @@ celerybeat.pid
 .mypy_cache/
 .dmypy.json
 dmypy.json
+
+#Ignore vscode AI rules
+.github\instructions\codacy.instructions.md
