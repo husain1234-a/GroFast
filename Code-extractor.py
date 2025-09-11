@@ -1,0 +1,350 @@
+#!/usr/bin/env python3
+"""
+File Content Extractor Script
+=============================
+This script extracts and copies all file contents from folders and subfolders
+into a single output file with complete file paths.
+
+Features:
+- Recursively scans all folders and subfolders
+- Includes complete file path before each file content
+- Adds 6 blank lines between files
+- Handles various file encodings (UTF-8, Latin-1, etc.)
+- Skips binary files and provides summary statistics
+- Creates backup if output file already exists
+
+Usage:
+    python file_extractor.py
+
+    Or customize the paths:
+    python file_extractor.py --input /path/to/source --output /path/to/output.txt
+"""
+
+import os
+import sys
+import argparse
+from datetime import datetime
+from pathlib import Path
+
+
+def is_text_file(file_path):
+    """
+    Check if a file is likely to be a text file by examining its extension
+    and attempting to read a small portion.
+    """
+    # Common text file extensions
+    text_extensions = {
+        ".txt",
+        ".py",
+        ".java",
+        ".js",
+        ".html",
+        ".css",
+        ".xml",
+        ".json",
+        ".yml",
+        ".yaml",
+        ".md",
+        ".sql",
+        ".sh",
+        ".bat",
+        ".ps1",
+        ".cs",
+        ".cpp",
+        ".c",
+        ".h",
+        ".php",
+        ".rb",
+        ".go",
+        ".rs",
+        ".kt",
+        ".swift",
+        ".tsx",
+        ".jsx",
+        ".vue",
+        ".scss",
+        ".less",
+        ".ini",
+        ".cfg",
+        ".conf",
+        ".log",
+        ".csv",
+        ".tsv",
+        ".dockerfile",
+        ".gitignore",
+        ".env",
+        ".properties",
+        ".gradle",
+        ".maven",
+        ".pom",
+        ".cob",
+        ".cobol",
+        ".jcl",
+    }
+
+    file_ext = Path(file_path).suffix.lower()
+
+    # Check by extension first
+    if file_ext in text_extensions:
+        return True
+
+    # For files without extension or unknown extensions, try to read a small portion
+    try:
+        with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
+            sample = f.read(1024)  # Read first 1KB
+            # Check if it contains mostly printable characters
+            printable_ratio = (
+                sum(c.isprintable() or c.isspace() for c in sample) / len(sample)
+                if sample
+                else 0
+            )
+            return printable_ratio > 0.7  # 70% printable characters threshold
+    except Exception:
+        return False
+
+
+def read_file_content(file_path):
+    """
+    Read file content with multiple encoding attempts.
+    """
+    encodings = ["utf-8", "utf-8-sig", "latin-1", "cp1252", "iso-8859-1"]
+
+    for encoding in encodings:
+        try:
+            with open(file_path, "r", encoding=encoding, errors="ignore") as f:
+                return f.read(), encoding
+        except Exception as e:
+            continue
+
+    # If all encodings fail, return error message
+    return f"[ERROR: Could not read file with any encoding - {str(e)}]", "unknown"
+
+
+def extract_files_content(input_dir, output_file, file_extensions=None):
+    """
+    Extract content from all files in the directory and subdirectories.
+
+    Args:
+        input_dir (str): Source directory path
+        output_file (str): Output file path
+        file_extensions (list): List of file extensions to include (optional)
+    """
+
+    input_path = Path(input_dir)
+    output_path = Path(output_file)
+
+    # Directories to skip
+    skip_directories = {
+        ".venv",
+        "venv",
+        "__pycache__",
+        ".git",
+        "node_modules",
+        ".pytest_cache",
+        ".mypy_cache",
+        "dist",
+        "build",
+    }
+
+    # Validate input directory
+    if not input_path.exists():
+        print(f"❌ Error: Input directory '{input_dir}' does not exist.")
+        return False
+
+    if not input_path.is_dir():
+        print(f"❌ Error: '{input_dir}' is not a directory.")
+        return False
+
+    # Create backup if output file exists
+    if output_path.exists():
+        backup_path = output_path.with_suffix(
+            f'.backup_{datetime.now().strftime("%Y%m%d_%H%M%S")}.txt'
+        )
+        output_path.rename(backup_path)
+        print(f"📁 Existing output file backed up to: {backup_path}")
+
+    # Create output directory if it doesn't exist
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+
+    # Statistics
+    total_files = 0
+    processed_files = 0
+    skipped_files = 0
+    error_files = 0
+
+    print(f"🔍 Scanning directory: {input_path.absolute()}")
+    print(f"📝 Output file: {output_path.absolute()}")
+    print("=" * 60)
+
+    try:
+        with open(output_path, "w", encoding="utf-8", errors="ignore") as output:
+            # Write header
+            header = f"""File Content Extraction Report
+====================================
+Source Directory: {input_path.absolute()}
+Extraction Date: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+Generated by: File Content Extractor Script
+
+{'='*60}
+
+"""
+            output.write(header)
+
+            # Walk through all files and directories
+            for root, dirs, files in os.walk(input_path):
+                # Remove directories we want to skip from dirs list (modifies os.walk behavior)
+                dirs[:] = [d for d in dirs if d not in skip_directories]
+
+                # Sort for consistent output
+                files.sort()
+                dirs.sort()
+
+                for file_name in files:
+                    file_path = Path(root) / file_name
+                    total_files += 1
+
+                    # Skip if specific extensions are requested and this file doesn't match
+                    if file_extensions:
+                        if not any(
+                            file_name.lower().endswith(ext.lower())
+                            for ext in file_extensions
+                        ):
+                            skipped_files += 1
+                            continue
+
+                    # Check if it's a text file
+                    if not is_text_file(file_path):
+                        print(
+                            f"⚠️  Skipped (binary): {file_path.relative_to(input_path)}"
+                        )
+                        skipped_files += 1
+                        continue
+
+                    try:
+                        # Read file content
+                        content, encoding_used = read_file_content(file_path)
+
+                        # Write file path and content to output
+                        relative_path = file_path.relative_to(input_path)
+                        separator = "=" * 80
+
+                        file_header = f"""{separator}
+FILE PATH: {file_path.absolute()}
+RELATIVE PATH: {relative_path}
+FILE SIZE: {file_path.stat().st_size} bytes
+ENCODING: {encoding_used}
+LAST MODIFIED: {datetime.fromtimestamp(file_path.stat().st_mtime).strftime('%Y-%m-%d %H:%M:%S')}
+{separator}
+
+"""
+
+                        output.write(file_header)
+                        output.write(content)
+                        output.write("\n\n\n\n\n\n")  # 6 blank lines as requested
+
+                        processed_files += 1
+                        print(f"✅ Processed: {relative_path}")
+
+                    except Exception as e:
+                        error_files += 1
+                        error_message = f"""{'='*80}
+FILE PATH: {file_path.absolute()}
+RELATIVE PATH: {file_path.relative_to(input_path)}
+ERROR: {str(e)}
+{'='*80}
+
+[FILE COULD NOT BE PROCESSED DUE TO ERROR]
+
+
+"""
+                        output.write(error_message)
+                        print(
+                            f"❌ Error processing: {file_path.relative_to(input_path)} - {str(e)}"
+                        )
+
+            # Write summary
+            summary = f"""
+
+{'='*80}
+EXTRACTION SUMMARY
+{'='*80}
+Total files found: {total_files}
+Files processed: {processed_files}
+Files skipped: {skipped_files}
+Files with errors: {error_files}
+Output file: {output_path.absolute()}
+Completion time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+{'='*80}
+"""
+            output.write(summary)
+
+    except Exception as e:
+        print(f"❌ Fatal error writing to output file: {str(e)}")
+        return False
+
+    # Print final summary
+    print("\n" + "=" * 60)
+    print("📊 EXTRACTION SUMMARY")
+    print("=" * 60)
+    print(f"Total files found: {total_files}")
+    print(f"Files processed: {processed_files}")
+    print(f"Files skipped: {skipped_files}")
+    print(f"Files with errors: {error_files}")
+    print(f"Output file: {output_path.absolute()}")
+    print(f"File size: {output_path.stat().st_size:,} bytes")
+    print("✅ Extraction completed successfully!")
+
+    return True
+
+
+def main():
+    """
+    Main function to handle command line arguments and execute the extraction.
+    """
+    parser = argparse.ArgumentParser(
+        description="Extract and combine all file contents from directories and subdirectories",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  python file_extractor.py
+  python file_extractor.py --input ./monolith --output combined_code.txt
+  python file_extractor.py --input ./src --output all_files.txt --extensions .py .js .java
+        """,
+    )
+
+    parser.add_argument(
+        "--input",
+        "-i",
+        default=".",
+        help="Input directory path (default: current directory)",
+    )
+
+    parser.add_argument(
+        "--output",
+        "-o",
+        default="extracted_files_content.txt",
+        help="Output file path (default: extracted_files_content.txt)",
+    )
+
+    parser.add_argument(
+        "--extensions",
+        "-e",
+        nargs="*",
+        help="File extensions to include (e.g., .py .java .js). If not specified, all text files will be included.",
+    )
+
+    args = parser.parse_args()
+
+    print("🚀 File Content Extractor Script")
+    print("=" * 60)
+
+    success = extract_files_content(
+        input_dir=args.input, output_file=args.output, file_extensions=args.extensions
+    )
+
+    if not success:
+        sys.exit(1)
+
+
+if __name__ == "__main__":
+    main()
