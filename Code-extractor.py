@@ -108,16 +108,17 @@ def read_file_content(file_path):
     Read file content with multiple encoding attempts.
     """
     encodings = ["utf-8", "utf-8-sig", "latin-1", "cp1252", "iso-8859-1"]
-
+    last_exception = None
     for encoding in encodings:
         try:
             with open(file_path, "r", encoding=encoding, errors="ignore") as f:
                 return f.read(), encoding
         except Exception as e:
+            last_exception = e
             continue
 
     # If all encodings fail, return error message
-    return f"[ERROR: Could not read file with any encoding - {str(e)}]", "unknown"
+    return f"[ERROR: Could not read file with any encoding - {str(last_exception)}]", "unknown"
 
 
 def extract_files_content(input_dir, output_file, file_extensions=None):
