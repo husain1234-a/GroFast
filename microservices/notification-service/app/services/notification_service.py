@@ -53,10 +53,31 @@ class NotificationService:
                 print(f"FCM sent successfully: {response}")
                 return True
             else:
-                # Mock implementation
-                print(f"FCM (Mock): {message['title']} - {message['body']} to {token[:10]}...")
-                await asyncio.sleep(0.1)
-                return True
+                # Use HTTP API as fallback
+                import httpx
+                fcm_url = "https://fcm.googleapis.com/fcm/send"
+                headers = {
+                    "Authorization": f"key={settings.fcm_server_key}",
+                    "Content-Type": "application/json"
+                }
+                
+                payload = {
+                    "to": token,
+                    "notification": {
+                        "title": message.get('title', ''),
+                        "body": message.get('body', '')
+                    },
+                    "data": {str(k): str(v) for k, v in data.items()}
+                }
+                
+                async with httpx.AsyncClient() as client:
+                    response = await client.post(fcm_url, headers=headers, json=payload)
+                    if response.status_code == 200:
+                        print(f"FCM sent via HTTP API: {token[:10]}...")
+                        return True
+                    else:
+                        print(f"FCM HTTP API error: {response.status_code}")
+                        return False
                 
         except Exception as e:
             print(f"FCM Error: {e}")
@@ -69,10 +90,35 @@ class NotificationService:
             raise CircuitBreakerError("Email circuit breaker is open")
         
         try:
-            # Mock email notification (integrate with Resend API)
-            print(f"Email to {email}: {subject}")
-            await asyncio.sleep(0.1)
-            return True
+            # Use Resend API
+            import httpx
+            if hasattr(settings, 'resend_api_key') and settings.resend_api_key:
+                url = "https://api.resend.com/emails"
+                headers = {
+                    "Authorization": f"Bearer {settings.resend_api_key}",
+                    "Content-Type": "application/json"
+                }
+                
+                payload = {
+                    "from": "Blinkit <noreply@blinkit.com>",
+                    "to": [email],
+                    "subject": subject,
+                    "html": content
+                }
+                
+                async with httpx.AsyncClient() as client:
+                    response = await client.post(url, headers=headers, json=payload)
+                    if response.status_code == 200:
+                        print(f"Email sent to {email}: {subject}")
+                        return True
+                    else:
+                        print(f"Resend API error: {response.status_code}")
+                        return False
+            else:
+                # Mock email notification
+                print(f"Email (Mock) to {email}: {subject}")
+                await asyncio.sleep(0.1)
+                return True
         except Exception as e:
             self.email_circuit_breaker.is_open = True
             raise
