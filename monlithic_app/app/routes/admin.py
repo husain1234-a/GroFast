@@ -14,6 +14,7 @@ from ..schemas.order import OrderResponse
 from ..schemas.user import UserResponse
 from ..services.notification_service import NotificationService, NotificationType, NotificationChannel
 import logging
+from monlithic_app.models import OrderItem
 
 logger = logging.getLogger(__name__)
 
