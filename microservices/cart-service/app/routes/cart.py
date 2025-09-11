@@ -56,20 +56,24 @@ async def remove_from_cart(
     logger.info(f"Product removed from cart for user {user_id}")
     return cart
 
-@router.delete("/clear", response_model=CartResponse)
+@router.delete("/clear")
 async def clear_cart(
     user_id: int = Depends(get_user_id_from_header),
     db: AsyncSession = Depends(get_db)
 ):
     """Clear all items from cart"""
     logger.info(f"Clearing cart for user {user_id}")
-    cart = await CartService.get_or_create_cart(db, user_id)
-    from sqlalchemy import delete
-    from ..models.cart import CartItem
-    
-    await db.execute(delete(CartItem).where(CartItem.cart_id == cart.id))
-    await db.commit()
-    
-    result = await CartService.get_cart_response(db, user_id)
+    await CartService.clear_cart(db, user_id)
     logger.info(f"Cart cleared for user {user_id}")
-    return result
+    return {"message": "Cart cleared successfully"}
+
+@router.delete("/{user_id}/clear")
+async def clear_cart_by_id(
+    user_id: int,
+    db: AsyncSession = Depends(get_db)
+):
+    """Clear cart by user ID (for internal service calls)"""
+    logger.info(f"Clearing cart for user {user_id} (internal call)")
+    await CartService.clear_cart(db, user_id)
+    logger.info(f"Cart cleared for user {user_id}")
+    return {"message": "Cart cleared successfully"}
