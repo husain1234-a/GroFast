@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Google Login Test - Blinkit Clone</title>
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+</head>
+<body>
+    <h1>Blinkit Clone - Google Login Test</h1>
+    
+    <div id="g_id_onload"
+         data-client_id="YOUR_GOOGLE_CLIENT_ID"
+         data-callback="handleCredentialResponse">
+    </div>
+    <div class="g_id_signin" data-type="standard"></div>
+    
+    <div id="result"></div>
+
+    <script>
+        function handleCredentialResponse(response) {
+            console.log("Encoded JWT ID token: " + response.credential);
+            
+            // Send to your backend
+            fetch('/auth/google-login', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    google_id_token: response.credential
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                console.log('Success:', data);
+                document.getElementById('result').innerHTML = 
+                    '<h3>Login Successful!</h3>' +
+                    '<p>Welcome, ' + data.name + '</p>' +
+                    '<p>Email: ' + data.email + '</p>';
+            })
+            .catch((error) => {
+                console.error('Error:', error);
+                document.getElementById('result').innerHTML = 
+                    '<h3>Login Failed</h3><p>' + error + '</p>';
+            });
+        }
+    </script>
+</body>
+</html>
