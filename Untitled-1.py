@@ -115,10 +115,7 @@ def read_file_content(file_path):
                 return f.read(), encoding
         except Exception as e:
             last_exception = e
-            continue
-
-    # If all encodings fail, return error message
-    return f"[ERROR: Could not read file with any encoding - {str(last_exception)}]", "unknown"
+            return f"[ERROR: Could not read file with any encoding - {str(last_exception)}]", "unknown"
 
 
 def extract_files_content(input_dir, output_file, file_extensions=None):
