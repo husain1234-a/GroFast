@@ -1,5 +1,5 @@
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, func
 from ..models.user import User
 from ..schemas.user import UserCreate, UserUpdate
 from fastapi import HTTPException, status
@@ -69,3 +69,17 @@ class AuthService:
     async def create_user_session(user_id: int, firebase_token: str) -> str:
         # Mock session creation
         return f"session:{user_id}:{firebase_token[-8:]}"
+    
+    @staticmethod
+    async def get_users_count(db: AsyncSession) -> int:
+        """Get total count of users"""
+        result = await db.execute(select(func.count(User.id)))
+        return result.scalar()
+    
+    @staticmethod
+    async def get_users_list(db: AsyncSession, limit: int = 50, offset: int = 0) -> list[User]:
+        """Get paginated list of users"""
+        result = await db.execute(
+            select(User).offset(offset).limit(limit).order_by(User.created_at.desc())
+        )
+        return result.scalars().all()

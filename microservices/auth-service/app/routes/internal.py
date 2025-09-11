@@ -78,3 +78,41 @@ async def get_user_info(
     except Exception as e:
         logger.error(f"Failed to get user info: {e}")
         raise HTTPException(status_code=500, detail="Internal server error")
+
+@router.get("/users/count")
+async def get_users_count(db: AsyncSession = Depends(get_db)):
+    """Get total count of users"""
+    try:
+        count = await AuthService.get_users_count(db)
+        return {"count": count}
+    except Exception as e:
+        logger.error(f"Failed to get users count: {e}")
+        return {"count": 0}
+
+@router.get("/users")
+async def get_users_list(
+    limit: int = 50,
+    offset: int = 0,
+    db: AsyncSession = Depends(get_db)
+):
+    """Get paginated list of users"""
+    try:
+        users = await AuthService.get_users_list(db, limit, offset)
+        total = await AuthService.get_users_count(db)
+        
+        return {
+            "users": [
+                {
+                    "id": user.id,
+                    "email": user.email,
+                    "name": user.name,
+                    "phone": user.phone,
+                    "is_active": user.is_active,
+                    "created_at": user.created_at
+                } for user in users
+            ],
+            "total": total
+        }
+    except Exception as e:
+        logger.error(f"Failed to get users list: {e}")
+        return {"users": [], "total": 0}
