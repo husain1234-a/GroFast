@@ -56,6 +56,11 @@ class AuthService:
         return result.scalar_one_or_none()
     
     @staticmethod
+    async def get_user_by_firebase_uid(db: AsyncSession, firebase_uid: str) -> User:
+        result = await db.execute(select(User).where(User.firebase_uid == firebase_uid))
+        return result.scalar_one_or_none()
+    
+    @staticmethod
     async def invalidate_session(session_key: str):
         # Mock session invalidation
         pass
