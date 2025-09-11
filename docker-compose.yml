@@ -32,7 +32,7 @@ services:
   meilisearch:
     image: getmeili/meilisearch:latest
     environment:
-      MEILI_MASTER_KEY: your-master-key
+      MEILI_MASTER_KEY: ${MEILI_MASTER_KEY:-secure-random-key-change-in-production}
       MEILI_ENV: development
     ports:
       - "7700:7700"
@@ -52,7 +52,7 @@ services:
       DATABASE_URL: postgresql+asyncpg://postgres:password123@postgres:5432/blinkit_db
       REDIS_URL: redis://redis:6379/0
       MEILISEARCH_URL: http://meilisearch:7700
-      MEILISEARCH_MASTER_KEY: your-master-key
+      MEILISEARCH_MASTER_KEY: ${MEILI_MASTER_KEY:-secure-random-key-change-in-production}
     depends_on:
       postgres:
         condition: service_healthy
