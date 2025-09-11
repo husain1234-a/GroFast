@@ -43,8 +43,9 @@ async def google_login(
 ):
     """Login with Google OAuth"""
     user = await AuthService.create_or_get_user_google(db, request.google_id_token)
-    return UserResponse.model_validate(user)# S
-ession management endpoints
+    return UserResponse.model_validate(user)
+    
+# Session management endpoints
 @router.post("/logout")
 async def logout_user(
     firebase_token: str,
