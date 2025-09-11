@@ -96,13 +96,13 @@ class AuthService:
             await db.commit()
             await db.refresh(user)
         
-        return user    @s
-taticmethod
+        return user   
+    @staticmethod
     async def get_user_by_id(db: AsyncSession, user_id: int) -> Optional[User]:
         """Get user by ID"""
         result = await db.execute(select(User).where(User.id == user_id))
         return result.scalar_one_or_none()   
- @staticmethod
+    @staticmethod
     async def create_user_session(user_id: int, firebase_token: str, expires_in: int = 3600) -> str:
         """Create user session in Redis"""
         if not redis_client:
