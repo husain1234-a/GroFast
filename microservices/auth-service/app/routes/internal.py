@@ -27,15 +27,9 @@ async def verify_token(
 ):
     """Internal endpoint to verify token for other services"""
     try:
-        # Verify Firebase token
-        decoded_token = auth.verify_id_token(request.token)
-        firebase_uid = decoded_token['uid']
+        # Use the real Firebase verification from auth service
+        user = await AuthService.create_or_get_user(db, request.token)
         
-        # Get user from database using Firebase UID
-        user = await AuthService.get_user_by_firebase_uid(db, firebase_uid)
-        if not user:
-            raise HTTPException(status_code=404, detail="User not found")
-            
         logger.info(f"Token verified for user: {user.id}")
         return {
             "user_id": user.id,
@@ -43,12 +37,9 @@ async def verify_token(
             "name": user.name,
             "is_active": user.is_active
         }
-    except auth.InvalidIdTokenError:
-        logger.error("Invalid Firebase token")
-        raise HTTPException(status_code=401, detail="Invalid token")
-    except auth.ExpiredIdTokenError:
-        logger.error("Expired Firebase token")
-        raise HTTPException(status_code=401, detail="Token expired")
+    except HTTPException as e:
+        logger.error(f"Token verification failed: {e.detail}")
+        raise e
     except Exception as e:
         logger.error(f"Token verification failed: {e}")
         raise HTTPException(status_code=401, detail="Invalid token")

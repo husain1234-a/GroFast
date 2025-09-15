@@ -23,12 +23,14 @@ async def get_categories(db: AsyncSession = Depends(get_db)):
     categories = result.scalars().all()
     return [CategoryResponse.model_validate(cat) for cat in categories]
 
-@router.get("/", response_model=List[ProductResponse])
+@router.get("", response_model=List[ProductResponse])
 async def get_products(
     category_id: Optional[int] = Query(None, description="Filter by category ID"),
     search: Optional[str] = Query(None, description="Search products by name"),
-    limit: int = Query(50, le=100, description="Maximum number of products to return"),
-    offset: int = Query(0, ge=0, description="Number of products to skip"),
+    page: int = Query(1, ge=1, description="Page number"),
+    size: int = Query(12, le=100, description="Items per page"),
+    sort_by: Optional[str] = Query(None, description="Sort field"),
+    sort_order: Optional[str] = Query(None, description="Sort order"),
     db: AsyncSession = Depends(get_db)
 ):
     """
@@ -53,7 +55,9 @@ async def get_products(
     if search:
         query = query.where(Product.name.ilike(f"%{search}%"))
     
-    query = query.offset(offset).limit(limit)
+    # Calculate offset from page and size
+    offset = (page - 1) * size
+    query = query.offset(offset).limit(size)
     
     result = await db.execute(query)
     products = result.scalars().all()

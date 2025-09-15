@@ -43,6 +43,28 @@ async def verify_otp(request: Request):
     except Exception:
         return {"error": "Authentication service unavailable", "fallback": True}
 
+@router.post("/google-login")
+async def google_login(request: Request):
+    body = await request.body()
+    try:
+        response = await auth_client.post(
+            "/google-login",
+            data=json.loads(body) if body else {},
+            headers={"content-type": "application/json"}
+        )
+        return response
+    except CircuitBreakerError:
+        data = json.loads(body) if body else {}
+        return {
+            "id": 1,
+            "firebase_uid": f"google_{data.get('google_id_token', 'demo')[-8:]}",
+            "email": "google.demo@gmail.com",
+            "name": "Google Demo User",
+            "fallback": True
+        }
+    except Exception:
+        return {"error": "Authentication service unavailable", "fallback": True}
+
 @router.get("/me")
 async def get_me(request: Request):
     try:

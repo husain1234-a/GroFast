@@ -239,10 +239,10 @@ class FirebaseAuth:
             return None
 
 # Convenience functions for backward compatibility
-def verify_firebase_token(token: str) -> Dict[str, Any]:
+async def verify_firebase_token(token: str) -> Dict[str, Any]:
     """Verify Firebase token - convenience function"""
     return FirebaseAuth.verify_firebase_token(token)
 
-def verify_google_token(token: str) -> Dict[str, Any]:
+async def verify_google_token(token: str) -> Dict[str, Any]:
     """Verify Google token - convenience function"""
     return FirebaseAuth.verify_google_token(token)

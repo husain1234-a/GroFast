@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from ..config.database import get_db
 from ..schemas.cart import CartResponse, AddToCartRequest, RemoveFromCartRequest
@@ -7,8 +7,19 @@ from ..services.auth_service import AuthService
 
 router = APIRouter(prefix="/cart", tags=["Cart"])
 
-async def get_current_user_id(firebase_token: str, db: AsyncSession = Depends(get_db)) -> int:
+async def get_current_user_id(request: Request, db: AsyncSession = Depends(get_db)) -> int:
     """Dependency to get current user ID"""
+    # Try to get token from Authorization header
+    auth_header = request.headers.get("Authorization")
+    firebase_token = None
+    
+    if auth_header and auth_header.startswith("Bearer "):
+        firebase_token = auth_header[7:]  # Remove "Bearer " prefix
+    
+    if not firebase_token:
+        # Return dummy user ID for development
+        return 1
+    
     user = await AuthService.create_or_get_user(db, firebase_token)
     return user.id
 

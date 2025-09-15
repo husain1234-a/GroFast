@@ -11,13 +11,13 @@ logger = logging.getLogger(__name__)
 class AuthServiceSettings(BaseServiceSettings):
     """Auth service configuration with enhanced error handling"""
     
-    # Firebase configuration
-    firebase_credentials_path: str
-    firebase_project_id: str
+    # Firebase configuration (optional for demo mode)
+    firebase_credentials_path: Optional[str] = None
+    firebase_project_id: Optional[str] = None
     
-    # Google OAuth configuration
-    google_client_id: str
-    google_client_secret: str
+    # Google OAuth configuration (optional for demo mode)
+    google_client_id: Optional[str] = None
+    google_client_secret: Optional[str] = None
     
     # Optional auth-specific settings
     token_expiry_hours: int = 24
@@ -31,18 +31,17 @@ class AuthServiceSettings(BaseServiceSettings):
     def get_critical_vars(self) -> List[str]:
         """Critical variables required for auth service to function"""
         base_vars = super().get_critical_vars()
-        auth_vars = [
-            "firebase_credentials_path",
-            "firebase_project_id", 
-            "google_client_id",
-            "google_client_secret"
-        ]
-        return base_vars + auth_vars
+        # Firebase vars are optional for demo mode
+        return base_vars
     
     def get_optional_vars(self) -> List[str]:
         """Optional variables with graceful degradation"""
         base_vars = super().get_optional_vars()
         auth_vars = [
+            "firebase_credentials_path",
+            "firebase_project_id", 
+            "google_client_id",
+            "google_client_secret",
             "token_expiry_hours",
             "refresh_token_expiry_days",
             "max_login_attempts",
@@ -54,10 +53,12 @@ class AuthServiceSettings(BaseServiceSettings):
         """Additional auth-specific validation"""
         super()._post_init_validation()
         
-        # Validate Firebase credentials file exists
-        if not os.path.exists(self.firebase_credentials_path):
+        # Validate Firebase credentials file exists (if provided)
+        if self.firebase_credentials_path and not os.path.exists(self.firebase_credentials_path):
             logger.warning(f"Firebase credentials file not found: {self.firebase_credentials_path}")
             # Don't fail startup, but log warning for monitoring
+        elif not self.firebase_credentials_path:
+            logger.info("No Firebase credentials path provided - running in demo mode")
         
         # Validate token expiry settings
         if self.token_expiry_hours < 1:
@@ -78,7 +79,8 @@ class AuthServiceSettings(BaseServiceSettings):
         base_health = self.get_configuration_health()
         
         auth_health = {
-            "firebase_credentials_file_exists": os.path.exists(self.firebase_credentials_path),
+            "firebase_credentials_file_exists": bool(self.firebase_credentials_path and os.path.exists(self.firebase_credentials_path)),
+            "demo_mode": not bool(self.firebase_credentials_path),
             "token_expiry_hours": self.token_expiry_hours,
             "refresh_token_expiry_days": self.refresh_token_expiry_days,
             "security_settings": {

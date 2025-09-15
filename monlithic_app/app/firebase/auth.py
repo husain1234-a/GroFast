@@ -8,7 +8,12 @@ logger = logging.getLogger(__name__)
 async def verify_firebase_token(id_token: str) -> dict:
     """Verify Firebase ID token and return user info"""
     try:
-        decoded_token = auth.verify_id_token(id_token)
+        import asyncio
+        # Add timeout to Firebase verification
+        decoded_token = await asyncio.wait_for(
+            asyncio.to_thread(auth.verify_id_token, id_token),
+            timeout=10.0  # 10 second timeout
+        )
         return {
             'uid': decoded_token['uid'],
             'phone': decoded_token.get('phone_number'),
@@ -48,6 +53,12 @@ async def verify_firebase_token(id_token: str) -> dict:
             status_code=status.HTTP_403_FORBIDDEN,
             detail="User account has been disabled"
         )
+    except asyncio.TimeoutError:
+        logger.error("Firebase token verification timed out")
+        raise HTTPException(
+            status_code=status.HTTP_408_REQUEST_TIMEOUT,
+            detail="Authentication request timed out"
+        )
     except Exception as e:
         logger.error(f"Firebase token verification failed: {e}")
         raise HTTPException(
@@ -58,8 +69,12 @@ async def verify_firebase_token(id_token: str) -> dict:
 async def verify_google_token(google_id_token: str) -> dict:
     """Verify Google ID token and return user info"""
     try:
-        # Google ID tokens can be verified directly by Firebase
-        decoded_token = auth.verify_id_token(google_id_token)
+        import asyncio
+        # Add timeout to Firebase verification
+        decoded_token = await asyncio.wait_for(
+            asyncio.to_thread(auth.verify_id_token, google_id_token),
+            timeout=10.0  # 10 second timeout
+        )
         return {
             'uid': decoded_token['uid'],
             'email': decoded_token.get('email'),
@@ -87,6 +102,12 @@ async def verify_google_token(google_id_token: str) -> dict:
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Google authentication token has been revoked",
             headers={"WWW-Authenticate": "Bearer"}
+        )
+    except asyncio.TimeoutError:
+        logger.error("Google token verification timed out")
+        raise HTTPException(
+            status_code=status.HTTP_408_REQUEST_TIMEOUT,
+            detail="Authentication request timed out"
         )
     except Exception as e:
         logger.error(f"Google token verification failed: {e}")

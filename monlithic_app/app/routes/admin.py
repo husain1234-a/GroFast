@@ -163,8 +163,7 @@ async def get_all_orders(
     result = await db.execute(query)
     orders = result.scalars().all()
     return [OrderResponse.model_validate(order) for order in orders]
-# Enha
-nced analytics endpoints
+# Enhanced analytics endpoints
 @router.get("/analytics/dashboard")
 async def get_dashboard_analytics(
     days: int = Query(30, description="Number of days for analytics"),

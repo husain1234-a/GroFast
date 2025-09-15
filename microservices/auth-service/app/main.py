@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from .routes import auth, internal
 from .config import settings
 from .database import db_manager
+from .firebase.auth import FirebaseAuth
 import firebase_admin
 from firebase_admin import credentials
 import sys
@@ -24,14 +25,19 @@ app = FastAPI(
 # Setup logging
 logger = setup_logging("auth-service", log_level="INFO")
 
-# Initialize Firebase Admin SDK
-if not firebase_admin._apps:
+# Initialize Firebase Admin SDK (if credentials provided)
+if not firebase_admin._apps and settings.firebase_credentials_path:
     try:
         cred = credentials.Certificate(settings.firebase_credentials_path)
         firebase_admin.initialize_app(cred)
         logger.info("Firebase Admin SDK initialized")
     except Exception as e:
         logger.error(f"Failed to initialize Firebase: {e}")
+else:
+    logger.info("Firebase credentials not provided - running in demo mode")
+
+# Initialize Firebase auth module
+FirebaseAuth.initialize()
 
 # Add startup validation
 app.add_event_handler(

@@ -4,12 +4,12 @@ from datetime import datetime
 import re
 
 class UserBase(BaseModel):
-    phone: Optional[str] = Field(None, regex=r'^\+?[1-9]\d{1,14}$', description="Valid phone number")
+    phone: Optional[str] = Field(None, pattern=r'^\+?[1-9]\d{1,14}$', description="Valid phone number")
     email: Optional[EmailStr] = None
     name: Optional[str] = Field(None, min_length=1, max_length=100, description="User name")
     address: Optional[str] = Field(None, min_length=5, max_length=500, description="User address")
-    latitude: Optional[str] = Field(None, regex=r'^-?([1-8]?\d(\.\d+)?|90(\.0+)?)$', description="Valid latitude")
-    longitude: Optional[str] = Field(None, regex=r'^-?((1[0-7]|[1-9])?\d(\.\d+)?|180(\.0+)?)$', description="Valid longitude")
+    latitude: Optional[str] = Field(None, pattern=r'^-?([1-8]?\d(\.\d+)?|90(\.0+)?)$', description="Valid latitude")
+    longitude: Optional[str] = Field(None, pattern=r'^-?((1[0-7]|[1-9])?\d(\.\d+)?|180(\.0+)?)$', description="Valid longitude")
     
     @validator('name')
     def validate_name(cls, v):
@@ -42,8 +42,8 @@ class UserCreate(UserBase):
 class UserUpdate(BaseModel):
     name: Optional[str] = Field(None, min_length=1, max_length=100)
     address: Optional[str] = Field(None, min_length=5, max_length=500)
-    latitude: Optional[str] = Field(None, regex=r'^-?([1-8]?\d(\.\d+)?|90(\.0+)?)$')
-    longitude: Optional[str] = Field(None, regex=r'^-?((1[0-7]|[1-9])?\d(\.\d+)?|180(\.0+)?)$')
+    latitude: Optional[str] = Field(None, pattern=r'^-?([1-8]?\d(\.\d+)?|90(\.0+)?)$')
+    longitude: Optional[str] = Field(None, pattern=r'^-?((1[0-7]|[1-9])?\d(\.\d+)?|180(\.0+)?)$')
     fcm_token: Optional[str] = Field(None, max_length=255)
     
     @validator('name')
@@ -66,7 +66,7 @@ class UserResponse(UserBase):
         from_attributes = True
 
 class LoginRequest(BaseModel):
-    phone: str = Field(..., regex=r'^\+?[1-9]\d{1,14}$', description="Valid phone number")
+    phone: str = Field(..., pattern=r'^\+?[1-9]\d{1,14}$', description="Valid phone number")
     
     @validator('phone')
     def validate_phone(cls, v):

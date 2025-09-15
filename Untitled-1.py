@@ -351,3 +351,4 @@ if __name__ == "__main__":
 
 # command to run
 ## python untitled-1.py --input C:\Users\husain.burhanpurwala\Downloads\blinkit_clone\monolithic_app --output monolithic_complete_code.txt
+## python untitled-1.py --input C:\Users\husain.burhanpurwala\Downloads\blinkit_clone\microservices --output microservices_complete_code.txt

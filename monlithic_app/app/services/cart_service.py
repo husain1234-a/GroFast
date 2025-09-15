@@ -32,9 +32,8 @@ class CartService:
     @classmethod
     async def get_redis_client(cls) -> redis.Redis:
         """Get Redis client for caching"""
-        if cls._redis_client is None:
-            cls._redis_client = redis.from_url(settings.redis_url)
-        return cls._redis_client
+        # Redis disabled for development
+        return None
     
     @staticmethod
     async def _get_cart_cache_key(user_id: int) -> str:
@@ -51,65 +50,21 @@ class CartService:
     
     @staticmethod
     async def _invalidate_cart_cache(user_id: int) -> None:
-        """
-        Invalidate cart cache for user.
-        
-        Args:
-            user_id: The user's unique identifier
-        """
-        try:
-            redis_client = await CartService.get_redis_client()
-            cache_key = await CartService._get_cart_cache_key(user_id)
-            await redis_client.delete(cache_key)
-        except Exception as e:
-            # Log but don't fail if cache invalidation fails
-            print(f"Cache invalidation failed: {e}")
+        """Invalidate cart cache for user."""
+        # Cache disabled for development
+        pass
     
     @staticmethod
     async def _get_cached_cart(user_id: int) -> Optional[Dict[str, Any]]:
-        """
-        Get cart from cache.
-        
-        Args:
-            user_id: The user's unique identifier
-            
-        Returns:
-            Optional[Dict[str, Any]]: Cached cart data or None if not found
-        """
-        try:
-            redis_client = await CartService.get_redis_client()
-            cache_key = await CartService._get_cart_cache_key(user_id)
-            cached_data = await redis_client.get(cache_key)
-            
-            if cached_data:
-                return json.loads(cached_data)
-        except Exception as e:
-            # Log but don't fail if cache read fails
-            print(f"Cache read failed: {e}")
-        
+        """Get cart from cache."""
+        # Cache disabled for development
         return None
     
     @staticmethod
     async def _cache_cart(user_id: int, cart_data: Dict[str, Any], ttl: int = 300) -> None:
-        """
-        Cache cart data with TTL.
-        
-        Args:
-            user_id: The user's unique identifier
-            cart_data: Cart data to cache
-            ttl: Time to live in seconds (default: 5 minutes)
-        """
-        try:
-            redis_client = await CartService.get_redis_client()
-            cache_key = await CartService._get_cart_cache_key(user_id)
-            await redis_client.setex(
-                cache_key, 
-                ttl, 
-                json.dumps(cart_data, default=str)
-            )
-        except Exception as e:
-            # Log but don't fail if cache write fails
-            print(f"Cache write failed: {e}")
+        """Cache cart data with TTL."""
+        # Cache disabled for development
+        pass
     
     @staticmethod
     async def get_or_create_cart(db: AsyncSession, user_id: int) -> Cart:
